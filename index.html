@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Depot Explorer</title>
+    <title>Find the Pallets</title>
     <style>
         * {
             margin: 0;
@@ -40,6 +40,11 @@
                 speed: 3.5,
                 x: 200,
                 y: 200
+            },
+            game: {
+                totalPallets: 10,
+                timeLimit: 90,
+                interactionRadius: 40
             }
         };
 
@@ -50,19 +55,27 @@
         canvas.height = CONFIG.canvas.height;
 
         // Game State
-        let gameState = 'start'; // 'start', 'playing'
+        let gameState = 'start'; // 'start', 'playing', 'gameover', 'success'
         const keys = {};
+        let keyPressed = {};
+
+        // Game variables
+        let timeRemaining = CONFIG.game.timeLimit;
+        let timerStarted = false;
+        let lastFrameTime = Date.now();
+        let palletsCollected = 0;
+        let score = 0;
+        let bestScore = parseInt(localStorage.getItem('palletsBestScore') || '0');
+        let showMinimap = false;
+        let particles = [];
 
         // Camera
         const camera = {
             x: 0,
             y: 0,
             update(player) {
-                // Center camera on player
                 this.x = player.x - CONFIG.canvas.width / 2;
                 this.y = player.y - CONFIG.canvas.height / 2;
-
-                // Clamp camera to world bounds
                 this.x = Math.max(0, Math.min(this.x, CONFIG.world.width - CONFIG.canvas.width));
                 this.y = Math.max(0, Math.min(this.y, CONFIG.world.height - CONFIG.canvas.height));
             }
@@ -75,7 +88,8 @@
             width: CONFIG.player.width,
             height: CONFIG.player.height,
             speed: CONFIG.player.speed,
-            direction: 0, // 0: down, 1: right, 2: up, 3: left
+            direction: 0,
+            hasMoved: false,
 
             update() {
                 let dx = 0;
@@ -84,27 +98,29 @@
                 if (keys['ArrowUp'] || keys['w'] || keys['W']) {
                     dy -= this.speed;
                     this.direction = 2;
+                    this.hasMoved = true;
                 }
                 if (keys['ArrowDown'] || keys['s'] || keys['S']) {
                     dy += this.speed;
                     this.direction = 0;
+                    this.hasMoved = true;
                 }
                 if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
                     dx -= this.speed;
                     this.direction = 3;
+                    this.hasMoved = true;
                 }
                 if (keys['ArrowRight'] || keys['d'] || keys['D']) {
                     dx += this.speed;
                     this.direction = 1;
+                    this.hasMoved = true;
                 }
 
-                // Normalize diagonal movement
                 if (dx !== 0 && dy !== 0) {
                     dx *= 0.707;
                     dy *= 0.707;
                 }
 
-                // Try to move and check collisions
                 const newX = this.x + dx;
                 const newY = this.y + dy;
 
@@ -115,9 +131,13 @@
                     this.y = newY;
                 }
 
-                // Clamp to world bounds
                 this.x = Math.max(this.width/2, Math.min(this.x, CONFIG.world.width - this.width/2));
                 this.y = Math.max(this.height/2, Math.min(this.y, CONFIG.world.height - this.height/2));
+
+                // Start timer on first move
+                if (this.hasMoved && !timerStarted) {
+                    timerStarted = true;
+                }
             },
 
             checkCollision(x, y) {
@@ -127,7 +147,6 @@
                     width: this.width,
                     height: this.height
                 };
-
                 return obstacles.some(obs => this.rectCollision(playerBox, obs));
             },
 
@@ -138,41 +157,53 @@
                        r1.y + r1.height > r2.y;
             },
 
+            getNearestPallet() {
+                let nearest = null;
+                let minDist = CONFIG.game.interactionRadius;
+
+                missingPallets.forEach(pallet => {
+                    if (!pallet.collected) {
+                        const dist = Math.hypot(this.x - pallet.x, this.y - pallet.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = pallet;
+                        }
+                    }
+                });
+
+                return nearest;
+            },
+
             draw() {
                 ctx.save();
                 ctx.translate(-camera.x, -camera.y);
 
-                // Shadow
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.beginPath();
                 ctx.ellipse(this.x + 2, this.y + this.height/2 + 4,
                            this.width/2 - 2, this.height/4, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Body
                 ctx.fillStyle = '#ff6b35';
                 ctx.fillRect(this.x - this.width/2, this.y - this.height/2,
                             this.width, this.height);
 
-                // Head
                 ctx.fillStyle = '#ffb88c';
                 ctx.fillRect(this.x - 8, this.y - this.height/2 - 6, 16, 8);
 
-                // Eyes based on direction
                 ctx.fillStyle = '#000';
-                if (this.direction === 0) { // Down
+                if (this.direction === 0) {
                     ctx.fillRect(this.x - 4, this.y - this.height/2 - 3, 2, 2);
                     ctx.fillRect(this.x + 2, this.y - this.height/2 - 3, 2, 2);
-                } else if (this.direction === 1) { // Right
+                } else if (this.direction === 1) {
                     ctx.fillRect(this.x + 2, this.y - this.height/2 - 3, 2, 2);
-                } else if (this.direction === 2) { // Up
+                } else if (this.direction === 2) {
                     ctx.fillRect(this.x - 4, this.y - this.height/2 - 4, 2, 1);
                     ctx.fillRect(this.x + 2, this.y - this.height/2 - 4, 2, 1);
-                } else { // Left
+                } else {
                     ctx.fillRect(this.x - 4, this.y - this.height/2 - 3, 2, 2);
                 }
 
-                // Vest stripes
                 ctx.fillStyle = '#ffed4e';
                 ctx.fillRect(this.x - this.width/2 + 2, this.y - 4, this.width - 4, 2);
                 ctx.fillRect(this.x - this.width/2 + 2, this.y + 4, this.width - 4, 2);
@@ -181,15 +212,44 @@
             }
         };
 
-        // Obstacles/Buildings
+        // Obstacles
         const obstacles = [];
+        const missingPallets = [];
 
-        // Helper to create obstacles
         function addObstacle(x, y, width, height, type = 'warehouse') {
             obstacles.push({ x, y, width, height, type });
         }
 
-        // Generate world obstacles
+        function isLocationValid(x, y, minDist = 40) {
+            // Check distance from player start
+            if (Math.hypot(x - CONFIG.player.x, y - CONFIG.player.y) < minDist) {
+                return false;
+            }
+
+            // Check collision with obstacles
+            const testBox = { x: x - 20, y: y - 20, width: 40, height: 40 };
+            return !obstacles.some(obs => {
+                return testBox.x < obs.x + obs.width &&
+                       testBox.x + testBox.width > obs.x &&
+                       testBox.y < obs.y + obs.height &&
+                       testBox.y + testBox.height > obs.y;
+            });
+        }
+
+        function addMissingPallet(x, y) {
+            if (isLocationValid(x, y, 60)) {
+                missingPallets.push({
+                    x, y,
+                    width: 30,
+                    height: 30,
+                    collected: false,
+                    pulsePhase: Math.random() * Math.PI * 2
+                });
+                return true;
+            }
+            return false;
+        }
+
         function generateWorld() {
             // Perimeter fence posts
             for (let i = 0; i < CONFIG.world.width; i += 80) {
@@ -221,29 +281,98 @@
             addObstacle(1400, 200, 60, 60, 'skip');
             addObstacle(2000, 900, 60, 60, 'skip');
 
-            // Traffic cones (small clusters)
+            // Traffic cones
             for (let i = 0; i < 15; i++) {
                 const x = Math.random() * CONFIG.world.width;
                 const y = Math.random() * CONFIG.world.height;
                 addObstacle(x, y, 12, 12, 'cone');
             }
 
-            // Pallets
+            // Obstacle pallets
             addObstacle(1100, 500, 40, 40, 'pallet');
             addObstacle(1150, 500, 40, 40, 'pallet');
             addObstacle(750, 800, 40, 40, 'pallet');
+
+            // Place 10 missing pallets in strategic locations
+            const palletLocations = [
+                { x: 380, y: 380 },      // Near warehouse1 corner
+                { x: 710, y: 200 },      // Between warehouses
+                { x: 920, y: 370 },      // Behind warehouse2
+                { x: 1250, y: 300 },     // Near road intersection
+                { x: 1750, y: 530 },     // Beside warehouse3
+                { x: 1820, y: 1030 },    // Behind office
+                { x: 500, y: 780 },      // Near warehouse4
+                { x: 850, y: 540 },      // Near skip
+                { x: 180, y: 560 },      // Beside trailer
+                { x: 2100, y: 200 },     // Along fence
+            ];
+
+            let placed = 0;
+            for (let loc of palletLocations) {
+                if (addMissingPallet(loc.x, loc.y)) {
+                    placed++;
+                }
+            }
+
+            // Try random locations if needed
+            while (placed < CONFIG.game.totalPallets) {
+                const x = 100 + Math.random() * (CONFIG.world.width - 200);
+                const y = 100 + Math.random() * (CONFIG.world.height - 200);
+                if (addMissingPallet(x, y)) {
+                    placed++;
+                }
+            }
         }
 
-        // Rendering
+        // Particles
+        function createCollectionParticles(x, y) {
+            for (let i = 0; i < 20; i++) {
+                const angle = (Math.PI * 2 * i) / 20;
+                const speed = 2 + Math.random() * 3;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: 0.02,
+                    size: 3 + Math.random() * 3,
+                    color: Math.random() > 0.5 ? '#ffed4e' : '#ff6b35'
+                });
+            }
+        }
+
+        function updateParticles() {
+            particles = particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1; // Gravity
+                p.life -= p.decay;
+                return p.life > 0;
+            });
+        }
+
+        function drawParticles() {
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // Rendering functions
         function drawYard() {
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
 
-            // Base ground
             ctx.fillStyle = '#3a3a3a';
             ctx.fillRect(0, 0, CONFIG.world.width, CONFIG.world.height);
 
-            // Procedural concrete texture
             const gridSize = 100;
             ctx.strokeStyle = '#2a2a2a';
             ctx.lineWidth = 2;
@@ -262,18 +391,15 @@
                 ctx.stroke();
             }
 
-            // Road markings
             ctx.strokeStyle = '#ffed4e';
             ctx.lineWidth = 3;
             ctx.setLineDash([20, 15]);
 
-            // Horizontal road
             ctx.beginPath();
             ctx.moveTo(0, 400);
             ctx.lineTo(CONFIG.world.width, 400);
             ctx.stroke();
 
-            // Vertical road
             ctx.beginPath();
             ctx.moveTo(1200, 0);
             ctx.lineTo(1200, CONFIG.world.height);
@@ -281,14 +407,13 @@
 
             ctx.setLineDash([]);
 
-            // Weathering/stains
             ctx.fillStyle = 'rgba(20,20,20,0.15)';
             for (let i = 0; i < 30; i++) {
-                const x = Math.random() * CONFIG.world.width;
-                const y = Math.random() * CONFIG.world.height;
-                const size = 20 + Math.random() * 40;
+                const x = (i * 731) % CONFIG.world.width;
+                const y = (i * 1021) % CONFIG.world.height;
+                const size = 20 + (i * 13 % 40);
                 ctx.beginPath();
-                ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+                ctx.ellipse(x, y, size, size * 0.6, (i * 0.5), 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -297,16 +422,12 @@
 
         function drawWarehouse(obs) {
             const shadowOffset = 6;
-
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Main building
             ctx.fillStyle = '#7c90a0';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            // Corrugated metal texture
             ctx.strokeStyle = '#6a7d8c';
             ctx.lineWidth = 1;
             for (let i = 0; i < obs.width; i += 8) {
@@ -316,11 +437,9 @@
                 ctx.stroke();
             }
 
-            // Roof
             ctx.fillStyle = '#5a6d7c';
             ctx.fillRect(obs.x, obs.y, obs.width, 20);
 
-            // Bay doors (3 doors)
             const doorWidth = 50;
             const doorHeight = 70;
             const spacing = (obs.width - doorWidth * 3) / 4;
@@ -329,11 +448,9 @@
                 const doorX = obs.x + spacing + i * (doorWidth + spacing);
                 const doorY = obs.y + obs.height - doorHeight - 10;
 
-                // Door frame
                 ctx.fillStyle = '#4a5d6c';
                 ctx.fillRect(doorX, doorY, doorWidth, doorHeight);
 
-                // Door panels
                 ctx.strokeStyle = '#3a4d5c';
                 ctx.lineWidth = 2;
                 for (let j = 0; j < 6; j++) {
@@ -343,12 +460,10 @@
                     ctx.stroke();
                 }
 
-                // Handle
                 ctx.fillStyle = '#2a2a2a';
                 ctx.fillRect(doorX + doorWidth - 8, doorY + doorHeight / 2 - 3, 4, 6);
             }
 
-            // Windows
             const windowSize = 15;
             const windowY = obs.y + 40;
             for (let i = 0; i < Math.floor(obs.width / 60); i++) {
@@ -363,16 +478,12 @@
 
         function drawOffice(obs) {
             const shadowOffset = 6;
-
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Main building
             ctx.fillStyle = '#c4b7a6';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            // Windows grid
             const windowWidth = 20;
             const windowHeight = 25;
             const cols = 4;
@@ -385,7 +496,6 @@
                     const winX = obs.x + spacingX + col * (windowWidth + spacingX);
                     const winY = obs.y + spacingY + row * (windowHeight + spacingY);
 
-                    // Window with reflection
                     const gradient = ctx.createLinearGradient(winX, winY, winX, winY + windowHeight);
                     gradient.addColorStop(0, '#d4e8f0');
                     gradient.addColorStop(0.5, '#a8d8f0');
@@ -393,12 +503,10 @@
                     ctx.fillStyle = gradient;
                     ctx.fillRect(winX, winY, windowWidth, windowHeight);
 
-                    // Window frame
                     ctx.strokeStyle = '#2a2a2a';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(winX, winY, windowWidth, windowHeight);
 
-                    // Cross divider
                     ctx.beginPath();
                     ctx.moveTo(winX + windowWidth/2, winY);
                     ctx.lineTo(winX + windowWidth/2, winY + windowHeight);
@@ -406,7 +514,6 @@
                 }
             }
 
-            // Entrance
             ctx.fillStyle = '#4a4a4a';
             ctx.fillRect(obs.x + obs.width/2 - 20, obs.y + obs.height - 50, 40, 50);
             ctx.fillStyle = '#a8d8f0';
@@ -415,16 +522,12 @@
 
         function drawTrailer(obs) {
             const shadowOffset = 4;
-
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Trailer body
             ctx.fillStyle = '#e8e8e8';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            // Corrugation lines
             ctx.strokeStyle = '#d0d0d0';
             ctx.lineWidth = 1;
             for (let i = 0; i < obs.width; i += 6) {
@@ -434,11 +537,9 @@
                 ctx.stroke();
             }
 
-            // Rear bumper
             ctx.fillStyle = '#4a4a4a';
             ctx.fillRect(obs.x, obs.y + obs.height - 4, obs.width, 4);
 
-            // Wheels
             ctx.fillStyle = '#2a2a2a';
             ctx.beginPath();
             ctx.arc(obs.x + 20, obs.y + obs.height, 6, 0, Math.PI * 2);
@@ -448,12 +549,9 @@
 
         function drawSkip(obs) {
             const shadowOffset = 4;
-
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Skip body (trapezoid shape)
             ctx.fillStyle = '#8b4513';
             ctx.beginPath();
             ctx.moveTo(obs.x + 5, obs.y);
@@ -463,7 +561,6 @@
             ctx.closePath();
             ctx.fill();
 
-            // Rim highlight
             ctx.strokeStyle = '#654321';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -471,20 +568,17 @@
             ctx.lineTo(obs.x + obs.width - 5, obs.y);
             ctx.stroke();
 
-            // Contents suggestion
             ctx.fillStyle = 'rgba(100,70,40,0.6)';
             ctx.fillRect(obs.x + 8, obs.y + 10, obs.width - 16, obs.height - 15);
         }
 
         function drawCone(obs) {
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();
             ctx.ellipse(obs.x + obs.width/2 + 1, obs.y + obs.height + 2,
                        obs.width/2, obs.height/4, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Cone body
             ctx.fillStyle = '#ff6b35';
             ctx.beginPath();
             ctx.moveTo(obs.x + obs.width/2, obs.y);
@@ -493,7 +587,6 @@
             ctx.closePath();
             ctx.fill();
 
-            // White stripes
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.moveTo(obs.x + obs.width/2 - 4, obs.y + obs.height * 0.3);
@@ -512,16 +605,12 @@
 
         function drawPallet(obs) {
             const shadowOffset = 3;
-
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Pallet base
             ctx.fillStyle = '#8b6914';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            // Slats
             ctx.fillStyle = '#6b5014';
             const slatCount = 5;
             const slatHeight = 3;
@@ -531,7 +620,6 @@
                 ctx.fillRect(obs.x, obs.y + i * spacing, obs.width, slatHeight);
             }
 
-            // Vertical supports
             ctx.fillStyle = '#5b4014';
             ctx.fillRect(obs.x + 5, obs.y, 3, obs.height);
             ctx.fillRect(obs.x + obs.width/2 - 1.5, obs.y, 3, obs.height);
@@ -539,15 +627,12 @@
         }
 
         function drawFencePost(obs) {
-            // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.fillRect(obs.x + 2, obs.y + 2, obs.width, obs.height);
 
-            // Post
             ctx.fillStyle = '#4a4a4a';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            // Top cap
             ctx.fillStyle = '#5a5a5a';
             ctx.fillRect(obs.x - 1, obs.y, obs.width + 2, 2);
         }
@@ -588,91 +673,404 @@
             ctx.restore();
         }
 
-        function drawHUD() {
-            // Semi-transparent background
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(10, 10, 250, 70);
-
-            // Title
-            ctx.fillStyle = '#ffed4e';
-            ctx.font = 'bold 20px Courier New';
-            ctx.fillText('DEPOT EXPLORER', 20, 35);
-
-            // Position
-            ctx.fillStyle = '#fff';
-            ctx.font = '14px Courier New';
-            ctx.fillText(`X: ${Math.floor(player.x)} Y: ${Math.floor(player.y)}`, 20, 55);
-
-            // Controls hint
-            ctx.fillStyle = '#aaa';
-            ctx.font = '12px Courier New';
-            ctx.fillText('WASD/Arrows to move', 20, 72);
-
-            // Mini compass
+        function drawMissingPallets() {
             ctx.save();
-            ctx.translate(CONFIG.canvas.width - 50, 40);
+            ctx.translate(-camera.x, -camera.y);
+
+            const time = Date.now() / 1000;
+
+            missingPallets.forEach(pallet => {
+                if (!pallet.collected) {
+                    const pulse = Math.sin(time * 3 + pallet.pulsePhase) * 0.15 + 0.85;
+
+                    // Glow
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#ffed4e';
+
+                    // Shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                    ctx.fillRect(pallet.x - pallet.width/2 + 3, pallet.y - pallet.height/2 + 3,
+                                pallet.width, pallet.height);
+
+                    // Pallet with pulse
+                    ctx.save();
+                    ctx.translate(pallet.x, pallet.y);
+                    ctx.scale(pulse, pulse);
+
+                    ctx.fillStyle = '#ffed4e';
+                    ctx.fillRect(-pallet.width/2, -pallet.height/2, pallet.width, pallet.height);
+
+                    ctx.fillStyle = '#d4c520';
+                    const slatCount = 4;
+                    const slatHeight = 2;
+                    const spacing = pallet.height / slatCount;
+
+                    for (let i = 0; i < slatCount; i++) {
+                        ctx.fillRect(-pallet.width/2, -pallet.height/2 + i * spacing,
+                                    pallet.width, slatHeight);
+                    }
+
+                    ctx.fillStyle = '#b4a520';
+                    ctx.fillRect(-pallet.width/2 + 4, -pallet.height/2, 2, pallet.height);
+                    ctx.fillRect(-1, -pallet.height/2, 2, pallet.height);
+                    ctx.fillRect(pallet.width/2 - 6, -pallet.height/2, 2, pallet.height);
+
+                    ctx.restore();
+                    ctx.shadowBlur = 0;
+                }
+            });
+
+            ctx.restore();
+        }
+
+        function drawInteractionPrompt() {
+            const nearest = player.getNearestPallet();
+            if (nearest) {
+                ctx.save();
+                ctx.translate(-camera.x, -camera.y);
+
+                const promptY = player.y - player.height - 20;
+                const promptText = 'Press SPACE to pick up';
+
+                ctx.font = '12px Courier New';
+                const textWidth = ctx.measureText(promptText).width;
+
+                // Background
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillRect(player.x - textWidth/2 - 5, promptY - 15, textWidth + 10, 20);
+
+                // Border
+                ctx.strokeStyle = '#ffed4e';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(player.x - textWidth/2 - 5, promptY - 15, textWidth + 10, 20);
+
+                // Text
+                ctx.fillStyle = '#ffed4e';
+                ctx.textAlign = 'center';
+                ctx.fillText(promptText, player.x, promptY);
+                ctx.textAlign = 'left';
+
+                ctx.restore();
+            }
+        }
+
+        function drawHUD() {
+            // Main HUD
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(10, 10, 280, 80);
+
             ctx.strokeStyle = '#ffed4e';
             ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(0, 0, 20, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.strokeRect(10, 10, 280, 80);
 
-            ctx.fillStyle = '#ff6b35';
-            ctx.beginPath();
-            ctx.moveTo(0, -15);
-            ctx.lineTo(-5, 0);
-            ctx.lineTo(5, 0);
-            ctx.closePath();
-            ctx.fill();
+            ctx.fillStyle = '#ffed4e';
+            ctx.font = 'bold 18px Courier New';
+            ctx.fillText('FIND THE PALLETS', 20, 32);
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 10px Courier New';
-            ctx.fillText('N', -4, -22);
+            ctx.font = 'bold 16px Courier New';
+            ctx.fillText(`Pallets: ${palletsCollected}/${CONFIG.game.totalPallets}`, 20, 55);
+
+            // Timer color changes when low
+            if (timeRemaining <= 10) {
+                ctx.fillStyle = '#ff4444';
+            } else if (timeRemaining <= 30) {
+                ctx.fillStyle = '#ff8844';
+            } else {
+                ctx.fillStyle = '#fff';
+            }
+            ctx.fillText(`Time: ${Math.ceil(timeRemaining)}`, 20, 75);
+
+            // Best score
+            if (bestScore > 0) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(10, 100, 280, 30);
+                ctx.strokeStyle = '#888';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(10, 100, 280, 30);
+
+                ctx.fillStyle = '#aaa';
+                ctx.font = '14px Courier New';
+                ctx.fillText(`Best: ${bestScore}`, 20, 120);
+            }
+
+            // Controls
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(CONFIG.canvas.width - 160, CONFIG.canvas.height - 60, 150, 50);
+
+            ctx.fillStyle = '#aaa';
+            ctx.font = '11px Courier New';
+            ctx.fillText('WASD/Arrows - Move', CONFIG.canvas.width - 150, CONFIG.canvas.height - 40);
+            ctx.fillText('SPACE - Pick up', CONFIG.canvas.width - 150, CONFIG.canvas.height - 25);
+            ctx.fillText('M - Toggle minimap', CONFIG.canvas.width - 150, CONFIG.canvas.height - 10);
+        }
+
+        function drawMinimap() {
+            if (!showMinimap) return;
+
+            const mmSize = 150;
+            const mmX = CONFIG.canvas.width - mmSize - 10;
+            const mmY = 10;
+            const scale = mmSize / Math.max(CONFIG.world.width, CONFIG.world.height);
+
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(mmX, mmY, mmSize, mmSize);
+
+            ctx.strokeStyle = '#ffed4e';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(mmX, mmY, mmSize, mmSize);
+
+            ctx.save();
+            ctx.translate(mmX, mmY);
+
+            // Obstacles
+            ctx.fillStyle = '#555';
+            obstacles.forEach(obs => {
+                if (obs.type !== 'cone' && obs.type !== 'fence-post') {
+                    ctx.fillRect(obs.x * scale, obs.y * scale,
+                                Math.max(2, obs.width * scale), Math.max(2, obs.height * scale));
+                }
+            });
+
+            // Missing pallets
+            missingPallets.forEach(pallet => {
+                if (!pallet.collected) {
+                    ctx.fillStyle = '#ffed4e';
+                    ctx.fillRect(pallet.x * scale - 2, pallet.y * scale - 2, 4, 4);
+                }
+            });
+
+            // Player
+            ctx.fillStyle = '#ff6b35';
+            ctx.fillRect(player.x * scale - 2, player.y * scale - 2, 4, 4);
+
             ctx.restore();
         }
 
         function drawStartScreen() {
-            // Background with gradient
             const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.canvas.height);
             gradient.addColorStop(0, '#1a1a2e');
             gradient.addColorStop(1, '#16213e');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
 
-            // Title
             ctx.fillStyle = '#ffed4e';
-            ctx.font = 'bold 60px Courier New';
+            ctx.font = 'bold 56px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillText('DEPOT EXPLORER', CONFIG.canvas.width / 2, 150);
+            ctx.fillText('FIND THE PALLETS', CONFIG.canvas.width / 2, 120);
 
-            // Subtitle
             ctx.fillStyle = '#ff6b35';
-            ctx.font = 'bold 24px Courier New';
-            ctx.fillText('Navigate the Industrial Yard', CONFIG.canvas.width / 2, 200);
+            ctx.font = '20px Courier New';
+            ctx.fillText('Depot Exploration Challenge', CONFIG.canvas.width / 2, 160);
 
-            // Instructions
             ctx.fillStyle = '#fff';
-            ctx.font = '18px Courier New';
-            ctx.fillText('CONTROLS:', CONFIG.canvas.width / 2, 280);
+            ctx.font = 'bold 18px Courier New';
+            ctx.fillText('MISSION:', CONFIG.canvas.width / 2, 220);
 
             ctx.font = '16px Courier New';
             ctx.fillStyle = '#aaa';
-            ctx.fillText('WASD or Arrow Keys - Move', CONFIG.canvas.width / 2, 310);
-            ctx.fillText('Explore the depot yard', CONFIG.canvas.width / 2, 340);
-            ctx.fillText('Avoid obstacles and buildings', CONFIG.canvas.width / 2, 365);
+            ctx.fillText(`Find all ${CONFIG.game.totalPallets} missing pallets in ${CONFIG.game.timeLimit} seconds`, CONFIG.canvas.width / 2, 250);
 
-            // Start prompt (pulsing)
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px Courier New';
+            ctx.fillText('CONTROLS:', CONFIG.canvas.width / 2, 300);
+
+            ctx.font = '16px Courier New';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('WASD or Arrow Keys - Move', CONFIG.canvas.width / 2, 330);
+            ctx.fillText('SPACE - Pick up pallet (when near)', CONFIG.canvas.width / 2, 355);
+            ctx.fillText('M - Toggle minimap', CONFIG.canvas.width / 2, 380);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px Courier New';
+            ctx.fillText('SCORING:', CONFIG.canvas.width / 2, 430);
+
+            ctx.font = '16px Courier New';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('+100 per pallet, +1 per second remaining', CONFIG.canvas.width / 2, 460);
+            ctx.fillText('-50 per pallet missing at timeout', CONFIG.canvas.width / 2, 485);
+
+            if (bestScore > 0) {
+                ctx.fillStyle = '#ffed4e';
+                ctx.font = 'bold 16px Courier New';
+                ctx.fillText(`Best Score: ${bestScore}`, CONFIG.canvas.width / 2, 520);
+            }
+
             const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
             ctx.fillStyle = `rgba(255, 237, 78, ${pulse})`;
-            ctx.font = 'bold 28px Courier New';
-            ctx.fillText('PRESS ANY KEY TO START', CONFIG.canvas.width / 2, 480);
-
-            // Footer
-            ctx.fillStyle = '#555';
-            ctx.font = '12px Courier New';
-            ctx.fillText('A single-file canvas game', CONFIG.canvas.width / 2, CONFIG.canvas.height - 30);
+            ctx.font = 'bold 24px Courier New';
+            ctx.fillText('PRESS ANY KEY TO START', CONFIG.canvas.width / 2, 560);
 
             ctx.textAlign = 'left';
+        }
+
+        function drawEndScreen() {
+            const isSuccess = palletsCollected === CONFIG.game.totalPallets;
+            const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.canvas.height);
+            if (isSuccess) {
+                gradient.addColorStop(0, '#1a2e1a');
+                gradient.addColorStop(1, '#163e16');
+            } else {
+                gradient.addColorStop(0, '#2e1a1a');
+                gradient.addColorStop(1, '#3e1616');
+            }
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+            ctx.textAlign = 'center';
+
+            if (isSuccess) {
+                ctx.fillStyle = '#4eff4e';
+                ctx.font = 'bold 48px Courier New';
+                ctx.fillText('ALL PALLETS RECOVERED', CONFIG.canvas.width / 2, 120);
+
+                ctx.fillStyle = '#8fff8f';
+                ctx.font = '24px Courier New';
+                ctx.fillText('Shift complete!', CONFIG.canvas.width / 2, 160);
+            } else {
+                ctx.fillStyle = '#ff4e4e';
+                ctx.font = 'bold 48px Courier New';
+                ctx.fillText('SHIFT OVER', CONFIG.canvas.width / 2, 120);
+
+                ctx.fillStyle = '#ff8f8f';
+                ctx.font = '24px Courier New';
+                ctx.fillText('Pallets missing.', CONFIG.canvas.width / 2, 160);
+            }
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 32px Courier New';
+            ctx.fillText(`Score: ${score}`, CONFIG.canvas.width / 2, 230);
+
+            if (score > bestScore) {
+                ctx.fillStyle = '#ffed4e';
+                ctx.font = 'bold 20px Courier New';
+                ctx.fillText('NEW BEST SCORE!', CONFIG.canvas.width / 2, 265);
+            } else if (bestScore > 0) {
+                ctx.fillStyle = '#aaa';
+                ctx.font = '18px Courier New';
+                ctx.fillText(`Best: ${bestScore}`, CONFIG.canvas.width / 2, 265);
+            }
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Courier New';
+            ctx.fillText('BREAKDOWN:', CONFIG.canvas.width / 2, 320);
+
+            ctx.font = '18px Courier New';
+            ctx.fillStyle = '#aaa';
+            const palletScore = palletsCollected * 100;
+            const timeBonus = Math.max(0, Math.ceil(timeRemaining));
+            const penalty = (CONFIG.game.totalPallets - palletsCollected) * 50;
+
+            ctx.fillText(`Pallets: ${palletsCollected} × 100 = ${palletScore}`, CONFIG.canvas.width / 2, 355);
+            ctx.fillText(`Time bonus: ${timeBonus}`, CONFIG.canvas.width / 2, 385);
+            if (penalty > 0) {
+                ctx.fillStyle = '#ff8888';
+                ctx.fillText(`Penalty: -${penalty}`, CONFIG.canvas.width / 2, 415);
+                ctx.fillStyle = '#aaa';
+            }
+
+            // Share button
+            ctx.fillStyle = 'rgba(255,237,78,0.2)';
+            ctx.fillRect(CONFIG.canvas.width / 2 - 120, 450, 240, 40);
+            ctx.strokeStyle = '#ffed4e';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(CONFIG.canvas.width / 2 - 120, 450, 240, 40);
+
+            ctx.fillStyle = '#ffed4e';
+            ctx.font = 'bold 16px Courier New';
+            ctx.fillText('Click here to copy result', CONFIG.canvas.width / 2, 475);
+
+            const pulse = Math.sin(Date.now() / 400) * 0.3 + 0.7;
+            ctx.fillStyle = `rgba(255, 255, 255, ${pulse})`;
+            ctx.font = 'bold 20px Courier New';
+            ctx.fillText('Press ENTER to restart', CONFIG.canvas.width / 2, 540);
+
+            ctx.textAlign = 'left';
+        }
+
+        function calculateScore() {
+            const palletScore = palletsCollected * 100;
+            const timeBonus = Math.max(0, Math.ceil(timeRemaining));
+            const penalty = (CONFIG.game.totalPallets - palletsCollected) * 50;
+            score = palletScore + timeBonus - penalty;
+
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('palletsBestScore', bestScore.toString());
+            }
+        }
+
+        function copyResult() {
+            const emoji = palletsCollected === CONFIG.game.totalPallets ? '🎉' : '📦';
+            const text = `${emoji} Find the Pallets: ${palletsCollected}/${CONFIG.game.totalPallets} pallets found | Score: ${score}`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                console.log('Result copied to clipboard!');
+            }).catch(() => {
+                console.log('Copy failed');
+            });
+        }
+
+        function restartGame() {
+            gameState = 'playing';
+            timeRemaining = CONFIG.game.timeLimit;
+            timerStarted = false;
+            palletsCollected = 0;
+            score = 0;
+            particles = [];
+            player.x = CONFIG.player.x;
+            player.y = CONFIG.player.y;
+            player.hasMoved = false;
+
+            missingPallets.forEach(p => p.collected = false);
+        }
+
+        // Update game state
+        function updateGame() {
+            const now = Date.now();
+            const deltaTime = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            if (gameState === 'playing') {
+                player.update();
+                camera.update(player);
+                updateParticles();
+
+                // Update timer
+                if (timerStarted && timeRemaining > 0) {
+                    timeRemaining -= deltaTime;
+
+                    if (timeRemaining <= 0) {
+                        timeRemaining = 0;
+                        calculateScore();
+                        gameState = palletsCollected === CONFIG.game.totalPallets ? 'success' : 'gameover';
+                    }
+                }
+
+                // Check for collection
+                if (keyPressed[' ']) {
+                    const nearest = player.getNearestPallet();
+                    if (nearest) {
+                        nearest.collected = true;
+                        palletsCollected++;
+                        createCollectionParticles(nearest.x, nearest.y);
+
+                        // Check win condition
+                        if (palletsCollected === CONFIG.game.totalPallets) {
+                            calculateScore();
+                            gameState = 'success';
+                        }
+                    }
+                    keyPressed[' '] = false;
+                }
+
+                // Toggle minimap
+                if (keyPressed['m'] || keyPressed['M']) {
+                    showMinimap = !showMinimap;
+                    keyPressed['m'] = false;
+                    keyPressed['M'] = false;
+                }
+            }
         }
 
         // Game Loop
@@ -680,17 +1078,21 @@
             if (gameState === 'start') {
                 drawStartScreen();
             } else if (gameState === 'playing') {
-                player.update();
-                camera.update(player);
+                updateGame();
 
-                // Clear and draw
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
 
                 drawYard();
                 drawObstacles();
+                drawMissingPallets();
                 player.draw();
+                drawParticles();
+                drawInteractionPrompt();
                 drawHUD();
+                drawMinimap();
+            } else if (gameState === 'gameover' || gameState === 'success') {
+                drawEndScreen();
             }
 
             requestAnimationFrame(gameLoop);
@@ -700,10 +1102,14 @@
         window.addEventListener('keydown', (e) => {
             if (gameState === 'start') {
                 gameState = 'playing';
+                lastFrameTime = Date.now();
+            } else if ((gameState === 'gameover' || gameState === 'success') && e.key === 'Enter') {
+                restartGame();
             }
-            keys[e.key] = true;
 
-            // Prevent scrolling
+            keys[e.key] = true;
+            keyPressed[e.key] = true;
+
             if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
                 e.preventDefault();
             }
@@ -711,6 +1117,21 @@
 
         window.addEventListener('keyup', (e) => {
             keys[e.key] = false;
+        });
+
+        // Click handler for copy button
+        canvas.addEventListener('click', (e) => {
+            if (gameState === 'gameover' || gameState === 'success') {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Check if click is in copy button area
+                if (x >= CONFIG.canvas.width / 2 - 120 && x <= CONFIG.canvas.width / 2 + 120 &&
+                    y >= 450 && y <= 490) {
+                    copyResult();
+                }
+            }
         });
 
         // Initialize and Start
