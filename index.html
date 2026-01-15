@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depot Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            border: 3px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        // Game Configuration
+        const CONFIG = {
+            canvas: { width: 800, height: 600 },
+            world: { width: 2400, height: 1400 },
+            player: {
+                width: 24,
+                height: 24,
+                speed: 3.5,
+                x: 200,
+                y: 200
+            }
+        };
+
+        // Initialize Canvas
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = CONFIG.canvas.width;
+        canvas.height = CONFIG.canvas.height;
+
+        // Game State
+        let gameState = 'start'; // 'start', 'playing'
+        const keys = {};
+
+        // Camera
+        const camera = {
+            x: 0,
+            y: 0,
+            update(player) {
+                // Center camera on player
+                this.x = player.x - CONFIG.canvas.width / 2;
+                this.y = player.y - CONFIG.canvas.height / 2;
+
+                // Clamp camera to world bounds
+                this.x = Math.max(0, Math.min(this.x, CONFIG.world.width - CONFIG.canvas.width));
+                this.y = Math.max(0, Math.min(this.y, CONFIG.world.height - CONFIG.canvas.height));
+            }
+        };
+
+        // Player
+        const player = {
+            x: CONFIG.player.x,
+            y: CONFIG.player.y,
+            width: CONFIG.player.width,
+            height: CONFIG.player.height,
+            speed: CONFIG.player.speed,
+            direction: 0, // 0: down, 1: right, 2: up, 3: left
+
+            update() {
+                let dx = 0;
+                let dy = 0;
+
+                if (keys['ArrowUp'] || keys['w'] || keys['W']) {
+                    dy -= this.speed;
+                    this.direction = 2;
+                }
+                if (keys['ArrowDown'] || keys['s'] || keys['S']) {
+                    dy += this.speed;
+                    this.direction = 0;
+                }
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                    dx -= this.speed;
+                    this.direction = 3;
+                }
+                if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                    dx += this.speed;
+                    this.direction = 1;
+                }
+
+                // Normalize diagonal movement
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.707;
+                    dy *= 0.707;
+                }
+
+                // Try to move and check collisions
+                const newX = this.x + dx;
+                const newY = this.y + dy;
+
+                if (!this.checkCollision(newX, this.y)) {
+                    this.x = newX;
+                }
+                if (!this.checkCollision(this.x, newY)) {
+                    this.y = newY;
+                }
+
+                // Clamp to world bounds
+                this.x = Math.max(this.width/2, Math.min(this.x, CONFIG.world.width - this.width/2));
+                this.y = Math.max(this.height/2, Math.min(this.y, CONFIG.world.height - this.height/2));
+            },
+
+            checkCollision(x, y) {
+                const playerBox = {
+                    x: x - this.width/2,
+                    y: y - this.height/2,
+                    width: this.width,
+                    height: this.height
+                };
+
+                return obstacles.some(obs => this.rectCollision(playerBox, obs));
+            },
+
+            rectCollision(r1, r2) {
+                return r1.x < r2.x + r2.width &&
+                       r1.x + r1.width > r2.x &&
+                       r1.y < r2.y + r2.height &&
+                       r1.y + r1.height > r2.y;
+            },
+
+            draw() {
+                ctx.save();
+                ctx.translate(-camera.x, -camera.y);
+
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(this.x + 2, this.y + this.height/2 + 4,
+                           this.width/2 - 2, this.height/4, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Body
+                ctx.fillStyle = '#ff6b35';
+                ctx.fillRect(this.x - this.width/2, this.y - this.height/2,
+                            this.width, this.height);
+
+                // Head
+                ctx.fillStyle = '#ffb88c';
+                ctx.fillRect(this.x - 8, this.y - this.height/2 - 6, 16, 8);
+
+                // Eyes based on direction
+                ctx.fillStyle = '#000';
+                if (this.direction === 0) { // Down
+                    ctx.fillRect(this.x - 4, this.y - this.height/2 - 3, 2, 2);
+                    ctx.fillRect(this.x + 2, this.y - this.height/2 - 3, 2, 2);
+                } else if (this.direction === 1) { // Right
+                    ctx.fillRect(this.x + 2, this.y - this.height/2 - 3, 2, 2);
+                } else if (this.direction === 2) { // Up
+                    ctx.fillRect(this.x - 4, this.y - this.height/2 - 4, 2, 1);
+                    ctx.fillRect(this.x + 2, this.y - this.height/2 - 4, 2, 1);
+                } else { // Left
+                    ctx.fillRect(this.x - 4, this.y - this.height/2 - 3, 2, 2);
+                }
+
+                // Vest stripes
+                ctx.fillStyle = '#ffed4e';
+                ctx.fillRect(this.x - this.width/2 + 2, this.y - 4, this.width - 4, 2);
+                ctx.fillRect(this.x - this.width/2 + 2, this.y + 4, this.width - 4, 2);
+
+                ctx.restore();
+            }
+        };
+
+        // Obstacles/Buildings
+        const obstacles = [];
+
+        // Helper to create obstacles
+        function addObstacle(x, y, width, height, type = 'warehouse') {
+            obstacles.push({ x, y, width, height, type });
+        }
+
+        // Generate world obstacles
+        function generateWorld() {
+            // Perimeter fence posts
+            for (let i = 0; i < CONFIG.world.width; i += 80) {
+                addObstacle(i, 0, 8, 8, 'fence-post');
+                addObstacle(i, CONFIG.world.height - 8, 8, 8, 'fence-post');
+            }
+            for (let i = 0; i < CONFIG.world.height; i += 80) {
+                addObstacle(0, i, 8, 8, 'fence-post');
+                addObstacle(CONFIG.world.width - 8, i, 8, 8, 'fence-post');
+            }
+
+            // Warehouses
+            addObstacle(400, 200, 280, 180, 'warehouse1');
+            addObstacle(900, 150, 320, 200, 'warehouse2');
+            addObstacle(1500, 300, 250, 220, 'warehouse3');
+            addObstacle(500, 600, 300, 160, 'warehouse4');
+
+            // Office block
+            addObstacle(1600, 800, 200, 250, 'office');
+
+            // Trailers
+            addObstacle(200, 500, 120, 40, 'trailer');
+            addObstacle(350, 550, 120, 40, 'trailer');
+            addObstacle(1200, 650, 120, 40, 'trailer');
+            addObstacle(1350, 650, 120, 40, 'trailer');
+
+            // Skips
+            addObstacle(800, 450, 60, 60, 'skip');
+            addObstacle(1400, 200, 60, 60, 'skip');
+            addObstacle(2000, 900, 60, 60, 'skip');
+
+            // Traffic cones (small clusters)
+            for (let i = 0; i < 15; i++) {
+                const x = Math.random() * CONFIG.world.width;
+                const y = Math.random() * CONFIG.world.height;
+                addObstacle(x, y, 12, 12, 'cone');
+            }
+
+            // Pallets
+            addObstacle(1100, 500, 40, 40, 'pallet');
+            addObstacle(1150, 500, 40, 40, 'pallet');
+            addObstacle(750, 800, 40, 40, 'pallet');
+        }
+
+        // Rendering
+        function drawYard() {
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Base ground
+            ctx.fillStyle = '#3a3a3a';
+            ctx.fillRect(0, 0, CONFIG.world.width, CONFIG.world.height);
+
+            // Procedural concrete texture
+            const gridSize = 100;
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 2;
+
+            for (let x = 0; x < CONFIG.world.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, CONFIG.world.height);
+                ctx.stroke();
+            }
+
+            for (let y = 0; y < CONFIG.world.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(CONFIG.world.width, y);
+                ctx.stroke();
+            }
+
+            // Road markings
+            ctx.strokeStyle = '#ffed4e';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([20, 15]);
+
+            // Horizontal road
+            ctx.beginPath();
+            ctx.moveTo(0, 400);
+            ctx.lineTo(CONFIG.world.width, 400);
+            ctx.stroke();
+
+            // Vertical road
+            ctx.beginPath();
+            ctx.moveTo(1200, 0);
+            ctx.lineTo(1200, CONFIG.world.height);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Weathering/stains
+            ctx.fillStyle = 'rgba(20,20,20,0.15)';
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * CONFIG.world.width;
+                const y = Math.random() * CONFIG.world.height;
+                const size = 20 + Math.random() * 40;
+                ctx.beginPath();
+                ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        function drawWarehouse(obs) {
+            const shadowOffset = 6;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Main building
+            ctx.fillStyle = '#7c90a0';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Corrugated metal texture
+            ctx.strokeStyle = '#6a7d8c';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < obs.width; i += 8) {
+                ctx.beginPath();
+                ctx.moveTo(obs.x + i, obs.y);
+                ctx.lineTo(obs.x + i, obs.y + obs.height);
+                ctx.stroke();
+            }
+
+            // Roof
+            ctx.fillStyle = '#5a6d7c';
+            ctx.fillRect(obs.x, obs.y, obs.width, 20);
+
+            // Bay doors (3 doors)
+            const doorWidth = 50;
+            const doorHeight = 70;
+            const spacing = (obs.width - doorWidth * 3) / 4;
+
+            for (let i = 0; i < 3; i++) {
+                const doorX = obs.x + spacing + i * (doorWidth + spacing);
+                const doorY = obs.y + obs.height - doorHeight - 10;
+
+                // Door frame
+                ctx.fillStyle = '#4a5d6c';
+                ctx.fillRect(doorX, doorY, doorWidth, doorHeight);
+
+                // Door panels
+                ctx.strokeStyle = '#3a4d5c';
+                ctx.lineWidth = 2;
+                for (let j = 0; j < 6; j++) {
+                    ctx.beginPath();
+                    ctx.moveTo(doorX, doorY + j * 12);
+                    ctx.lineTo(doorX + doorWidth, doorY + j * 12);
+                    ctx.stroke();
+                }
+
+                // Handle
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(doorX + doorWidth - 8, doorY + doorHeight / 2 - 3, 4, 6);
+            }
+
+            // Windows
+            const windowSize = 15;
+            const windowY = obs.y + 40;
+            for (let i = 0; i < Math.floor(obs.width / 60); i++) {
+                const windowX = obs.x + 20 + i * 60;
+                ctx.fillStyle = '#a8d8f0';
+                ctx.fillRect(windowX, windowY, windowSize, windowSize);
+                ctx.strokeStyle = '#2a2a2a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(windowX, windowY, windowSize, windowSize);
+            }
+        }
+
+        function drawOffice(obs) {
+            const shadowOffset = 6;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Main building
+            ctx.fillStyle = '#c4b7a6';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Windows grid
+            const windowWidth = 20;
+            const windowHeight = 25;
+            const cols = 4;
+            const rows = 6;
+            const spacingX = (obs.width - cols * windowWidth) / (cols + 1);
+            const spacingY = (obs.height - rows * windowHeight) / (rows + 1);
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const winX = obs.x + spacingX + col * (windowWidth + spacingX);
+                    const winY = obs.y + spacingY + row * (windowHeight + spacingY);
+
+                    // Window with reflection
+                    const gradient = ctx.createLinearGradient(winX, winY, winX, winY + windowHeight);
+                    gradient.addColorStop(0, '#d4e8f0');
+                    gradient.addColorStop(0.5, '#a8d8f0');
+                    gradient.addColorStop(1, '#88b8d0');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(winX, winY, windowWidth, windowHeight);
+
+                    // Window frame
+                    ctx.strokeStyle = '#2a2a2a';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(winX, winY, windowWidth, windowHeight);
+
+                    // Cross divider
+                    ctx.beginPath();
+                    ctx.moveTo(winX + windowWidth/2, winY);
+                    ctx.lineTo(winX + windowWidth/2, winY + windowHeight);
+                    ctx.stroke();
+                }
+            }
+
+            // Entrance
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(obs.x + obs.width/2 - 20, obs.y + obs.height - 50, 40, 50);
+            ctx.fillStyle = '#a8d8f0';
+            ctx.fillRect(obs.x + obs.width/2 - 15, obs.y + obs.height - 45, 30, 35);
+        }
+
+        function drawTrailer(obs) {
+            const shadowOffset = 4;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Trailer body
+            ctx.fillStyle = '#e8e8e8';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Corrugation lines
+            ctx.strokeStyle = '#d0d0d0';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < obs.width; i += 6) {
+                ctx.beginPath();
+                ctx.moveTo(obs.x + i, obs.y);
+                ctx.lineTo(obs.x + i, obs.y + obs.height);
+                ctx.stroke();
+            }
+
+            // Rear bumper
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(obs.x, obs.y + obs.height - 4, obs.width, 4);
+
+            // Wheels
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.arc(obs.x + 20, obs.y + obs.height, 6, 0, Math.PI * 2);
+            ctx.arc(obs.x + obs.width - 20, obs.y + obs.height, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawSkip(obs) {
+            const shadowOffset = 4;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Skip body (trapezoid shape)
+            ctx.fillStyle = '#8b4513';
+            ctx.beginPath();
+            ctx.moveTo(obs.x + 5, obs.y);
+            ctx.lineTo(obs.x + obs.width - 5, obs.y);
+            ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+            ctx.lineTo(obs.x, obs.y + obs.height);
+            ctx.closePath();
+            ctx.fill();
+
+            // Rim highlight
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(obs.x + 5, obs.y);
+            ctx.lineTo(obs.x + obs.width - 5, obs.y);
+            ctx.stroke();
+
+            // Contents suggestion
+            ctx.fillStyle = 'rgba(100,70,40,0.6)';
+            ctx.fillRect(obs.x + 8, obs.y + 10, obs.width - 16, obs.height - 15);
+        }
+
+        function drawCone(obs) {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(obs.x + obs.width/2 + 1, obs.y + obs.height + 2,
+                       obs.width/2, obs.height/4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cone body
+            ctx.fillStyle = '#ff6b35';
+            ctx.beginPath();
+            ctx.moveTo(obs.x + obs.width/2, obs.y);
+            ctx.lineTo(obs.x, obs.y + obs.height);
+            ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+            ctx.closePath();
+            ctx.fill();
+
+            // White stripes
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(obs.x + obs.width/2 - 4, obs.y + obs.height * 0.3);
+            ctx.lineTo(obs.x + 2, obs.y + obs.height * 0.45);
+            ctx.lineTo(obs.x + obs.width - 2, obs.y + obs.height * 0.45);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(obs.x + obs.width/2 - 6, obs.y + obs.height * 0.6);
+            ctx.lineTo(obs.x + 1, obs.y + obs.height * 0.75);
+            ctx.lineTo(obs.x + obs.width - 1, obs.y + obs.height * 0.75);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawPallet(obs) {
+            const shadowOffset = 3;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Pallet base
+            ctx.fillStyle = '#8b6914';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Slats
+            ctx.fillStyle = '#6b5014';
+            const slatCount = 5;
+            const slatHeight = 3;
+            const spacing = obs.height / slatCount;
+
+            for (let i = 0; i < slatCount; i++) {
+                ctx.fillRect(obs.x, obs.y + i * spacing, obs.width, slatHeight);
+            }
+
+            // Vertical supports
+            ctx.fillStyle = '#5b4014';
+            ctx.fillRect(obs.x + 5, obs.y, 3, obs.height);
+            ctx.fillRect(obs.x + obs.width/2 - 1.5, obs.y, 3, obs.height);
+            ctx.fillRect(obs.x + obs.width - 8, obs.y, 3, obs.height);
+        }
+
+        function drawFencePost(obs) {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(obs.x + 2, obs.y + 2, obs.width, obs.height);
+
+            // Post
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Top cap
+            ctx.fillStyle = '#5a5a5a';
+            ctx.fillRect(obs.x - 1, obs.y, obs.width + 2, 2);
+        }
+
+        function drawObstacles() {
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            obstacles.forEach(obs => {
+                switch(obs.type) {
+                    case 'warehouse1':
+                    case 'warehouse2':
+                    case 'warehouse3':
+                    case 'warehouse4':
+                        drawWarehouse(obs);
+                        break;
+                    case 'office':
+                        drawOffice(obs);
+                        break;
+                    case 'trailer':
+                        drawTrailer(obs);
+                        break;
+                    case 'skip':
+                        drawSkip(obs);
+                        break;
+                    case 'cone':
+                        drawCone(obs);
+                        break;
+                    case 'pallet':
+                        drawPallet(obs);
+                        break;
+                    case 'fence-post':
+                        drawFencePost(obs);
+                        break;
+                }
+            });
+
+            ctx.restore();
+        }
+
+        function drawHUD() {
+            // Semi-transparent background
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(10, 10, 250, 70);
+
+            // Title
+            ctx.fillStyle = '#ffed4e';
+            ctx.font = 'bold 20px Courier New';
+            ctx.fillText('DEPOT EXPLORER', 20, 35);
+
+            // Position
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px Courier New';
+            ctx.fillText(`X: ${Math.floor(player.x)} Y: ${Math.floor(player.y)}`, 20, 55);
+
+            // Controls hint
+            ctx.fillStyle = '#aaa';
+            ctx.font = '12px Courier New';
+            ctx.fillText('WASD/Arrows to move', 20, 72);
+
+            // Mini compass
+            ctx.save();
+            ctx.translate(CONFIG.canvas.width - 50, 40);
+            ctx.strokeStyle = '#ffed4e';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ff6b35';
+            ctx.beginPath();
+            ctx.moveTo(0, -15);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(5, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Courier New';
+            ctx.fillText('N', -4, -22);
+            ctx.restore();
+        }
+
+        function drawStartScreen() {
+            // Background with gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.canvas.height);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+            // Title
+            ctx.fillStyle = '#ffed4e';
+            ctx.font = 'bold 60px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('DEPOT EXPLORER', CONFIG.canvas.width / 2, 150);
+
+            // Subtitle
+            ctx.fillStyle = '#ff6b35';
+            ctx.font = 'bold 24px Courier New';
+            ctx.fillText('Navigate the Industrial Yard', CONFIG.canvas.width / 2, 200);
+
+            // Instructions
+            ctx.fillStyle = '#fff';
+            ctx.font = '18px Courier New';
+            ctx.fillText('CONTROLS:', CONFIG.canvas.width / 2, 280);
+
+            ctx.font = '16px Courier New';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('WASD or Arrow Keys - Move', CONFIG.canvas.width / 2, 310);
+            ctx.fillText('Explore the depot yard', CONFIG.canvas.width / 2, 340);
+            ctx.fillText('Avoid obstacles and buildings', CONFIG.canvas.width / 2, 365);
+
+            // Start prompt (pulsing)
+            const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+            ctx.fillStyle = `rgba(255, 237, 78, ${pulse})`;
+            ctx.font = 'bold 28px Courier New';
+            ctx.fillText('PRESS ANY KEY TO START', CONFIG.canvas.width / 2, 480);
+
+            // Footer
+            ctx.fillStyle = '#555';
+            ctx.font = '12px Courier New';
+            ctx.fillText('A single-file canvas game', CONFIG.canvas.width / 2, CONFIG.canvas.height - 30);
+
+            ctx.textAlign = 'left';
+        }
+
+        // Game Loop
+        function gameLoop() {
+            if (gameState === 'start') {
+                drawStartScreen();
+            } else if (gameState === 'playing') {
+                player.update();
+                camera.update(player);
+
+                // Clear and draw
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+                drawYard();
+                drawObstacles();
+                player.draw();
+                drawHUD();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Input Handling
+        window.addEventListener('keydown', (e) => {
+            if (gameState === 'start') {
+                gameState = 'playing';
+            }
+            keys[e.key] = true;
+
+            // Prevent scrolling
+            if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Initialize and Start
+        generateWorld();
+        gameLoop();
+    </script>
+</body>
+</html>
