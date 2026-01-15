@@ -44,7 +44,8 @@
             game: {
                 totalPallets: 10,
                 timeLimit: 90,
-                interactionRadius: 40
+                interactionRadius: 40,
+                doorCooldown: 300
             }
         };
 
@@ -63,8 +64,9 @@
         let currentSceneId = 'yard';
         let scenes = {};
         let fadeAlpha = 0;
-        let fadeDirection = 0; // 0: none, 1: fade out, 2: fade in
+        let fadeDirection = 0;
         let pendingSceneSwitch = null;
+        let doorCooldownUntil = 0;
 
         // Game variables
         let timeRemaining = CONFIG.game.timeLimit;
@@ -88,19 +90,15 @@
             update(player) {
                 const scene = scenes[currentSceneId];
 
-                // Target position (center on player)
                 this.targetX = player.x - CONFIG.canvas.width / 2;
                 this.targetY = player.y - CONFIG.canvas.height / 2;
 
-                // Clamp to scene bounds
                 this.targetX = Math.max(0, Math.min(this.targetX, scene.width - CONFIG.canvas.width));
                 this.targetY = Math.max(0, Math.min(this.targetY, scene.height - CONFIG.canvas.height));
 
-                // Smooth follow
                 this.x += (this.targetX - this.x) * this.smoothing;
                 this.y += (this.targetY - this.y) * this.smoothing;
 
-                // Final clamp to prevent floating point drift
                 this.x = Math.max(0, Math.min(this.x, scene.width - CONFIG.canvas.width));
                 this.y = Math.max(0, Math.min(this.y, scene.height - CONFIG.canvas.height));
             }
@@ -109,6 +107,81 @@
         // World data
         let missingPallets = [];
         let forklift = null;
+
+        // Spawn validation
+        function validateAndFixSpawn(x, y) {
+            const scene = scenes[currentSceneId];
+
+            // Check if current position is valid
+            const playerBox = {
+                x: x - CONFIG.player.width/2,
+                y: y - CONFIG.player.height/2,
+                width: CONFIG.player.width,
+                height: CONFIG.player.height
+            };
+
+            // Check collision with current position
+            const hasCollision = scene.obstacles.some(obs => rectCollision(playerBox, obs));
+
+            if (!hasCollision) {
+                return { x, y, adjusted: false };
+            }
+
+            // Position is invalid, search outward
+            if (showDebug) {
+                console.log(`[Spawn Safety] Invalid spawn at (${x}, ${y}), searching for safe position...`);
+            }
+
+            const searchStep = 8;
+            const maxRadius = 200;
+
+            // Spiral search outward
+            for (let radius = searchStep; radius <= maxRadius; radius += searchStep) {
+                const angles = Math.ceil(radius / searchStep) * 8;
+                for (let i = 0; i < angles; i++) {
+                    const angle = (Math.PI * 2 * i) / angles;
+                    const testX = x + Math.cos(angle) * radius;
+                    const testY = y + Math.sin(angle) * radius;
+
+                    // Check bounds
+                    if (testX < CONFIG.player.width/2 ||
+                        testX > scene.width - CONFIG.player.width/2 ||
+                        testY < CONFIG.player.height/2 ||
+                        testY > scene.height - CONFIG.player.height/2) {
+                        continue;
+                    }
+
+                    const testBox = {
+                        x: testX - CONFIG.player.width/2,
+                        y: testY - CONFIG.player.height/2,
+                        width: CONFIG.player.width,
+                        height: CONFIG.player.height
+                    };
+
+                    const testCollision = scene.obstacles.some(obs => rectCollision(testBox, obs));
+                    if (!testCollision) {
+                        if (showDebug) {
+                            console.log(`[Spawn Safety] Found safe position at (${Math.floor(testX)}, ${Math.floor(testY)}) after searching ${radius}px radius`);
+                        }
+                        return { x: testX, y: testY, adjusted: true };
+                    }
+                }
+            }
+
+            // If still no safe spot found, use fallback
+            const fallback = scene.safeFallbackSpawn || { x: scene.width / 2, y: scene.height / 2 };
+            if (showDebug) {
+                console.log(`[Spawn Safety] No safe position found, using fallback (${fallback.x}, ${fallback.y})`);
+            }
+            return { x: fallback.x, y: fallback.y, adjusted: true };
+        }
+
+        function rectCollision(r1, r2) {
+            return r1.x < r2.x + r2.width &&
+                   r1.x + r1.width > r2.x &&
+                   r1.y < r2.y + r2.height &&
+                   r1.y + r1.height > r2.y;
+        }
 
         // Player
         const player = {
@@ -185,14 +258,7 @@
                     height: this.height
                 };
                 const scene = scenes[currentSceneId];
-                return scene.obstacles.some(obs => this.rectCollision(playerBox, obs));
-            },
-
-            rectCollision(r1, r2) {
-                return r1.x < r2.x + r2.width &&
-                       r1.x + r1.width > r2.x &&
-                       r1.y < r2.y + r2.height &&
-                       r1.y + r1.height > r2.y;
+                return scene.obstacles.some(obs => rectCollision(playerBox, obs));
             },
 
             getNearestPallet() {
@@ -213,6 +279,10 @@
             },
 
             getNearestDoor() {
+                if (Date.now() < doorCooldownUntil) {
+                    return null;
+                }
+
                 const scene = scenes[currentSceneId];
                 if (!scene.doors) return null;
 
@@ -292,10 +362,10 @@
                 groundAreas: [],
                 obstacles: [],
                 decorations: [],
-                doors: []
+                doors: [],
+                safeFallbackSpawn: { x: 300, y: 1150 }
             };
 
-            // Grass base
             scene.groundAreas.push({
                 type: 'grass',
                 x: 0, y: 0,
@@ -303,7 +373,6 @@
                 height: scene.height
             });
 
-            // Public road at bottom
             scene.groundAreas.push({
                 type: 'road',
                 x: 0, y: 1320,
@@ -311,7 +380,6 @@
                 height: 80
             });
 
-            // Access road
             scene.groundAreas.push({
                 type: 'road',
                 x: 250, y: 1200,
@@ -319,7 +387,6 @@
                 height: 120
             });
 
-            // Yard tarmac
             scene.groundAreas.push({
                 type: 'tarmac',
                 x: 150, y: 900,
@@ -341,7 +408,6 @@
                 height: 200
             });
 
-            // Perimeter fence
             const fenceThickness = 8;
 
             for (let x = 0; x < scene.width; x += 80) {
@@ -388,7 +454,7 @@
                 });
             }
 
-            // Warehouse
+            // Warehouse (x: 600-1200, y: 150-400)
             const warehouse = {
                 type: 'warehouse-main',
                 x: 600, y: 150,
@@ -415,19 +481,19 @@
 
             scene.obstacles.push(warehouse);
 
-            // Warehouse door (man door on left side)
+            // Warehouse door - positioned OUTSIDE building at left side, below it
             scene.doors.push({
-                x: 580,
-                y: 350,
-                width: 30,
-                height: 10,
+                x: 565,
+                y: 415,
+                width: 50,
+                height: 20,
                 label: 'Enter Warehouse',
                 targetSceneId: 'warehouseInterior',
                 targetSpawnX: 100,
                 targetSpawnY: 900
             });
 
-            // Office block
+            // Office block (x: 180-320, y: 1000-1180)
             scene.obstacles.push({
                 type: 'office',
                 x: 180, y: 1000,
@@ -435,19 +501,18 @@
                 height: 180
             });
 
-            // Office door
+            // Office door - positioned OUTSIDE building at entrance
             scene.doors.push({
                 x: 235,
-                y: 1180,
+                y: 1195,
                 width: 30,
-                height: 10,
+                height: 20,
                 label: 'Enter Office',
                 targetSceneId: 'officeInterior',
                 targetSpawnX: 600,
-                targetSpawnY: 700
+                targetSpawnY: 720
             });
 
-            // Office car park
             for (let i = 0; i < 4; i++) {
                 scene.decorations.push({
                     type: 'parking-bay',
@@ -458,7 +523,6 @@
                 });
             }
 
-            // Footpath
             scene.decorations.push({
                 type: 'footpath',
                 x: 250, y: 900,
@@ -466,7 +530,6 @@
                 height: 100
             });
 
-            // 10 Parked trucks
             const truckStartX = 800;
             const truckStartY = 800;
             const truckSpacing = 100;
@@ -482,7 +545,6 @@
                 });
             }
 
-            // Oil stains
             for (let i = 0; i < 15; i++) {
                 const x = 200 + Math.random() * 1000;
                 const y = 450 + Math.random() * 500;
@@ -493,7 +555,6 @@
                 });
             }
 
-            // Traffic cones
             const conePositions = [
                 { x: 500, y: 950 },
                 { x: 650, y: 420 },
@@ -527,10 +588,10 @@
                 renderSettings: {
                     ambientBrightness: 0.85,
                     vignetteStrength: 0.3
-                }
+                },
+                safeFallbackSpawn: { x: 900, y: 500 }
             };
 
-            // Floor
             scene.groundAreas.push({
                 type: 'warehouse-floor',
                 x: 0, y: 0,
@@ -544,7 +605,6 @@
             scene.obstacles.push({ type: 'wall', x: 0, y: 0, width: 20, height: scene.height });
             scene.obstacles.push({ type: 'wall', x: scene.width - 20, y: 0, width: 20, height: scene.height });
 
-            // Racking rows (6 long rows)
             const rackingRows = [
                 { x: 200, y: 150, width: 80, height: 600 },
                 { x: 400, y: 150, width: 80, height: 600 },
@@ -558,10 +618,8 @@
                 scene.obstacles.push({ type: 'racking', ...rack });
             });
 
-            // Internal blocks (office/break room)
             scene.obstacles.push({ type: 'internal-room', x: 1500, y: 800, width: 250, height: 150 });
 
-            // Floor markings
             for (let x = 100; x < scene.width; x += 200) {
                 scene.decorations.push({
                     type: 'floor-marking',
@@ -571,7 +629,6 @@
                 });
             }
 
-            // Stacked pallets (decoration)
             const palletStacks = [
                 { x: 100, y: 200 },
                 { x: 550, y: 300 },
@@ -589,16 +646,16 @@
                 });
             });
 
-            // Exit door
+            // Exit door - positioned BEFORE the bottom wall
             scene.doors.push({
                 x: 80,
-                y: scene.height - 50,
+                y: scene.height - 70,
                 width: 60,
-                height: 30,
+                height: 40,
                 label: 'Exit to Yard',
                 targetSceneId: 'yard',
-                targetSpawnX: 580,
-                targetSpawnY: 365
+                targetSpawnX: 590,
+                targetSpawnY: 440
             });
 
             return scene;
@@ -616,10 +673,10 @@
                 renderSettings: {
                     ambientBrightness: 0.9,
                     vignetteStrength: 0.2
-                }
+                },
+                safeFallbackSpawn: { x: 600, y: 400 }
             };
 
-            // Floor
             scene.groundAreas.push({
                 type: 'office-floor',
                 x: 0, y: 0,
@@ -627,13 +684,11 @@
                 height: scene.height
             });
 
-            // Perimeter walls
             scene.obstacles.push({ type: 'wall', x: 0, y: 0, width: scene.width, height: 20 });
             scene.obstacles.push({ type: 'wall', x: 0, y: scene.height - 20, width: scene.width, height: 20 });
             scene.obstacles.push({ type: 'wall', x: 0, y: 0, width: 20, height: scene.height });
             scene.obstacles.push({ type: 'wall', x: scene.width - 20, y: 0, width: 20, height: scene.height });
 
-            // Desk clusters
             const desks = [
                 { x: 100, y: 150, width: 60, height: 40 },
                 { x: 200, y: 150, width: 60, height: 40 },
@@ -651,30 +706,25 @@
                 scene.obstacles.push({ type: 'desk', ...desk });
             });
 
-            // Meeting room
             scene.obstacles.push({ type: 'meeting-room', x: 800, y: 150, width: 350, height: 250 });
-
-            // Corridor wall
             scene.obstacles.push({ type: 'wall', x: 400, y: 400, width: 20, height: 300 });
 
-            // Plants (decoration)
             scene.decorations.push({ type: 'plant', x: 450, y: 100, size: 30 });
             scene.decorations.push({ type: 'plant', x: 750, y: 100, size: 30 });
             scene.decorations.push({ type: 'plant', x: 100, y: 500, size: 30 });
 
-            // Noticeboard
             scene.decorations.push({ type: 'noticeboard', x: 50, y: 400, width: 80, height: 60 });
 
-            // Exit door
+            // Exit door - positioned BEFORE the bottom wall
             scene.doors.push({
                 x: 570,
-                y: scene.height - 50,
+                y: scene.height - 70,
                 width: 60,
-                height: 30,
+                height: 40,
                 label: 'Exit to Yard',
                 targetSceneId: 'yard',
                 targetSpawnX: 250,
-                targetSpawnY: 1195
+                targetSpawnY: 1220
             });
 
             return scene;
@@ -736,10 +786,7 @@
                 },
 
                 rectCollision(r1, r2) {
-                    return r1.x < r2.x + r2.width &&
-                           r1.x + r1.width > r2.x &&
-                           r1.y < r2.y + r2.height &&
-                           r1.y + r1.height > r2.y;
+                    return rectCollision(r1, r2);
                 },
 
                 hitPlayer() {
@@ -861,7 +908,6 @@
             scenes.warehouseInterior = buildWarehouseInterior();
             scenes.officeInterior = buildOfficeInterior();
 
-            // Place pallets across scenes
             const palletLocations = [
                 { sceneId: 'yard', x: 750, y: 520 },
                 { sceneId: 'yard', x: 1150, y: 520 },
@@ -906,12 +952,19 @@
                     fadeAlpha = 1;
                     if (pendingSceneSwitch) {
                         currentSceneId = pendingSceneSwitch.sceneId;
-                        player.x = pendingSceneSwitch.x;
-                        player.y = pendingSceneSwitch.y;
+
+                        // Validate and fix spawn position
+                        const safeSpawn = validateAndFixSpawn(pendingSceneSwitch.x, pendingSceneSwitch.y);
+                        player.x = safeSpawn.x;
+                        player.y = safeSpawn.y;
+
                         camera.x = player.x - CONFIG.canvas.width / 2;
                         camera.y = player.y - CONFIG.canvas.height / 2;
                         pendingSceneSwitch = null;
                         fadeDirection = 2;
+
+                        // Set door cooldown
+                        doorCooldownUntil = Date.now() + CONFIG.game.doorCooldown;
                     }
                 }
             } else if (fadeDirection === 2) {
@@ -943,7 +996,6 @@
                 ctx.fillRect(area.x, area.y, area.width, area.height);
             });
 
-            // Floor textures
             if (currentSceneId === 'warehouseInterior') {
                 ctx.strokeStyle = '#2a2a2a';
                 ctx.lineWidth = 2;
@@ -963,7 +1015,6 @@
                     }
                 }
             } else if (currentSceneId === 'yard') {
-                // Road markings
                 scene.groundAreas.forEach(area => {
                     if (area.type === 'road') {
                         ctx.strokeStyle = '#ffed4e';
@@ -1285,6 +1336,12 @@
                 });
             }
 
+            // Player hitbox
+            const pBox = player.getBox();
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(pBox.x, pBox.y, pBox.width, pBox.height);
+
             // Forklift
             if (currentSceneId === 'yard') {
                 ctx.strokeStyle = '#ffaa00';
@@ -1302,10 +1359,14 @@
                 ctx.stroke();
             }
 
-            // Scene ID
+            // Scene ID and door cooldown
             ctx.fillStyle = '#fff';
             ctx.font = '14px Courier New';
-            ctx.fillText(`Scene: ${currentSceneId}`, 10, scene.height - 10);
+            ctx.fillText(`Scene: ${currentSceneId}`, 10, scene.height - 30);
+            if (Date.now() < doorCooldownUntil) {
+                const remaining = Math.ceil((doorCooldownUntil - Date.now()) / 100) / 10;
+                ctx.fillText(`Door cooldown: ${remaining}s`, 10, scene.height - 10);
+            }
         }
 
         function drawInteractionPrompt() {
@@ -1617,6 +1678,7 @@
             player.stunned = false;
             fadeAlpha = 0;
             fadeDirection = 0;
+            doorCooldownUntil = 0;
 
             missingPallets.forEach(p => p.collected = false);
             forklift.x = 700;
