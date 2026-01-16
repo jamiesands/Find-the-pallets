@@ -395,7 +395,7 @@
                 type: 'tarmac',
                 x: 100, y: 100,
                 width: 300,
-                height: 250
+                height: 400
             });
 
             // Yard tarmac (center area)
@@ -433,13 +433,13 @@
                 type: 'office',
                 x: 430, y: 100,
                 width: 220,
-                height: 300
+                height: 400
             });
 
             // Office door - below office entrance
             scene.doors.push({
                 x: 515,
-                y: 410,
+                y: 510,
                 width: 50,
                 height: 20,
                 label: 'Enter Office',
@@ -475,17 +475,22 @@
 
             scene.obstacles.push(warehouse);
 
-            // Warehouse door - below warehouse at bay 4
-            scene.doors.push({
-                x: 1000,
-                y: 510,
-                width: 60,
-                height: 20,
-                label: 'Enter Warehouse',
-                targetSceneId: 'warehouseInterior',
-                targetSpawnX: 900,
-                targetSpawnY: 900
-            });
+            // Warehouse doors - one for each bay
+            for (let i = 0; i < 8; i++) {
+                const bayX = warehouse.x + baySpacing + i * (bayWidth + baySpacing);
+                const bayY = warehouse.y + warehouse.height;
+
+                scene.doors.push({
+                    x: bayX + 5,
+                    y: bayY + 10,
+                    width: bayWidth - 10,
+                    height: 20,
+                    label: `Bay ${i + 1}`,
+                    targetSceneId: 'warehouseInterior',
+                    targetSpawnX: 200 + i * 200,
+                    targetSpawnY: 900
+                });
+            }
 
             // === TRAILER PARK (top right, right of warehouse) ===
             // Parked trailers
@@ -517,7 +522,7 @@
             const truckStartY = 1000;
             const truckSpacing = 110;
 
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 6; i++) {
                 scene.obstacles.push({
                     type: 'truck',
                     x: truckStartX + i * truckSpacing,
@@ -538,23 +543,6 @@
                     size: 15 + Math.random() * 25
                 });
             }
-
-            const conePositions = [
-                { x: 650, y: 600 },
-                { x: 1250, y: 700 },
-                { x: 450, y: 850 },
-                { x: 1650, y: 650 }
-            ];
-
-            conePositions.forEach(pos => {
-                scene.decorations.push({
-                    type: 'cone',
-                    x: pos.x,
-                    y: pos.y,
-                    width: 12,
-                    height: 12
-                });
-            });
 
             return scene;
         }
@@ -629,17 +617,25 @@
                 });
             });
 
-            // Exit door - positioned BEFORE the bottom wall
-            scene.doors.push({
-                x: 80,
-                y: scene.height - 70,
-                width: 60,
-                height: 40,
-                label: 'Exit to Yard',
-                targetSceneId: 'yard',
-                targetSpawnX: 590,
-                targetSpawnY: 440
-            });
+            // Exit doors - 8 doors matching the 8 bays outside
+            const doorWidth = 60;
+            const totalDoorWidth = doorWidth * 8;
+            const doorSpacing = (scene.width - totalDoorWidth) / 9;
+
+            for (let i = 0; i < 8; i++) {
+                const doorX = doorSpacing + i * (doorWidth + doorSpacing);
+
+                scene.doors.push({
+                    x: doorX,
+                    y: scene.height - 70,
+                    width: doorWidth,
+                    height: 40,
+                    label: `Exit Bay ${i + 1}`,
+                    targetSceneId: 'yard',
+                    targetSpawnX: 680 + 20 + (70 + 20) * i + 35,  // Position at each bay
+                    targetSpawnY: 530
+                });
+            }
 
             return scene;
         }
@@ -809,17 +805,17 @@
 
                     ctx.fillStyle = '#888';
                     if (this.direction === 0) {
-                        ctx.fillRect(this.x - 10, this.y + this.height/2, 8, 12);
-                        ctx.fillRect(this.x + 2, this.y + this.height/2, 8, 12);
+                        ctx.fillRect(this.x - 10, this.y + this.height/2, 6, 30);
+                        ctx.fillRect(this.x + 4, this.y + this.height/2, 6, 30);
                     } else if (this.direction === 1) {
-                        ctx.fillRect(this.x + this.width/2, this.y - 10, 12, 8);
-                        ctx.fillRect(this.x + this.width/2, this.y + 2, 12, 8);
+                        ctx.fillRect(this.x + this.width/2, this.y - 10, 30, 6);
+                        ctx.fillRect(this.x + this.width/2, this.y + 4, 30, 6);
                     } else if (this.direction === 2) {
-                        ctx.fillRect(this.x - 10, this.y - this.height/2 - 12, 8, 12);
-                        ctx.fillRect(this.x + 2, this.y - this.height/2 - 12, 8, 12);
+                        ctx.fillRect(this.x - 10, this.y - this.height/2 - 30, 6, 30);
+                        ctx.fillRect(this.x + 4, this.y - this.height/2 - 30, 6, 30);
                     } else {
-                        ctx.fillRect(this.x - this.width/2 - 12, this.y - 10, 12, 8);
-                        ctx.fillRect(this.x - this.width/2 - 12, this.y + 2, 12, 8);
+                        ctx.fillRect(this.x - this.width/2 - 30, this.y - 10, 30, 6);
+                        ctx.fillRect(this.x - this.width/2 - 30, this.y + 4, 30, 6);
                     }
 
                     ctx.fillStyle = '#000';
@@ -1132,16 +1128,6 @@
                         ctx.lineTo(bay.x + bay.width, bay.y - 60 + j * 12);
                         ctx.stroke();
                     }
-
-                    ctx.strokeStyle = '#ffed4e';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(bay.x - 10, bay.y + 5, bay.width + 20, 80);
-
-                    ctx.fillStyle = '#ffed4e';
-                    ctx.font = 'bold 16px Courier New';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(bay.number, bay.x + bay.width/2, bay.y + 50);
-                    ctx.textAlign = 'left';
                 });
             }
         }
@@ -1157,7 +1143,7 @@
             const windowWidth = 18;
             const windowHeight = 22;
             const cols = 3;
-            const rows = 5;
+            const rows = 7;
             const spacingX = (obs.width - cols * windowWidth) / (cols + 1);
             const spacingY = (obs.height - rows * windowHeight) / (rows + 1);
 
