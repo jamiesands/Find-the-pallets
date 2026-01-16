@@ -38,8 +38,8 @@
                 width: 24,
                 height: 24,
                 speed: 3.5,
-                x: 300,
-                y: 1150
+                x: 310,
+                y: 1260
             },
             game: {
                 totalPallets: 10,
@@ -363,7 +363,7 @@
                 obstacles: [],
                 decorations: [],
                 doors: [],
-                safeFallbackSpawn: { x: 300, y: 1150 }
+                safeFallbackSpawn: { x: 310, y: 1260 }
             };
 
             scene.groundAreas.push({
@@ -1672,8 +1672,12 @@
             palletsCollected = 0;
             score = 0;
             particles = [];
-            player.x = CONFIG.player.x;
-            player.y = CONFIG.player.y;
+
+            // Validate spawn position to prevent spawning in obstacles
+            const safeSpawn = validateAndFixSpawn(CONFIG.player.x, CONFIG.player.y);
+            player.x = safeSpawn.x;
+            player.y = safeSpawn.y;
+
             player.hasMoved = false;
             player.stunned = false;
             fadeAlpha = 0;
@@ -1822,6 +1826,12 @@
 
         // Initialize and Start
         generateWorld();
+
+        // Validate initial player spawn position
+        const initialSpawn = validateAndFixSpawn(CONFIG.player.x, CONFIG.player.y);
+        player.x = initialSpawn.x;
+        player.y = initialSpawn.y;
+
         gameLoop();
     </script>
 </body>
