@@ -12,7 +12,7 @@
         }
         body {
             font-family: 'Courier New', monospace;
-            background: #1a1a1a;
+            background: #87ceeb;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -314,7 +314,7 @@
             draw() {
                 ctx.save();
 
-                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillStyle = 'rgba(0,0,0,0.15)';
                 ctx.beginPath();
                 ctx.ellipse(this.x + 2, this.y + this.height/2 + 4,
                            this.width/2 - 2, this.height/4, 0, 0, Math.PI * 2);
@@ -901,7 +901,7 @@
 
                     ctx.save();
 
-                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
                     ctx.beginPath();
                     ctx.ellipse(this.x + 2, this.y + this.height/2 + 3,
                                this.width/2, this.height/4, 0, 0, Math.PI * 2);
@@ -1088,17 +1088,17 @@
 
             scene.groundAreas.forEach(area => {
                 if (area.type === 'grass') {
-                    ctx.fillStyle = '#4a6741';
+                    ctx.fillStyle = '#7ec850';
                 } else if (area.type === 'road') {
-                    ctx.fillStyle = '#3a3a3a';
+                    ctx.fillStyle = '#666666';
                 } else if (area.type === 'tarmac') {
-                    ctx.fillStyle = '#2a2a2a';
+                    ctx.fillStyle = '#555555';
                 } else if (area.type === 'warehouse-floor') {
-                    ctx.fillStyle = '#3a3a3a';
+                    ctx.fillStyle = '#888888';
                 } else if (area.type === 'office-floor') {
-                    ctx.fillStyle = '#5a5a5a';
+                    ctx.fillStyle = '#a0a0a0';
                 } else if (area.type === 'workshop-floor') {
-                    ctx.fillStyle = '#4a4a4a';
+                    ctx.fillStyle = '#7a7a7a';
                 }
 
                 ctx.fillRect(area.x, area.y, area.width, area.height);
@@ -1143,7 +1143,7 @@
 
             scene.decorations.forEach(dec => {
                 if (dec.type === 'oil-stain') {
-                    ctx.fillStyle = 'rgba(20,20,20,0.3)';
+                    ctx.fillStyle = 'rgba(40,40,40,0.25)';
                     ctx.beginPath();
                     ctx.ellipse(dec.x, dec.y, dec.size, dec.size * 0.6, 0, 0, Math.PI * 2);
                     ctx.fill();
@@ -1179,7 +1179,7 @@
                     ctx.strokeRect(dec.x, dec.y, dec.width, dec.height);
                 } else if (dec.type === 'parked-car') {
                     // Car shadow
-                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
                     ctx.fillRect(dec.x + 3, dec.y + 3, dec.width, dec.height);
                     // Car body
                     ctx.fillStyle = ['#cc0000', '#0044cc', '#555', '#fff'][Math.floor(dec.x / 100) % 4];
@@ -1244,26 +1244,26 @@
                 } else if (obs.type === 'fence-post') {
                     drawFencePost(obs);
                 } else if (obs.type === 'wall') {
-                    ctx.fillStyle = '#666';
+                    ctx.fillStyle = '#999';
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
                 } else if (obs.type === 'racking') {
                     drawRacking(obs);
                 } else if (obs.type === 'internal-room') {
-                    ctx.fillStyle = '#7c90a0';
+                    ctx.fillStyle = '#a0c0d0';
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    ctx.strokeStyle = '#5a6d7c';
+                    ctx.strokeStyle = '#80a0b0';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                 } else if (obs.type === 'desk') {
-                    ctx.fillStyle = '#8b7355';
+                    ctx.fillStyle = '#c09870';
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    ctx.strokeStyle = '#654321';
+                    ctx.strokeStyle = '#a08050';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                 } else if (obs.type === 'meeting-room') {
-                    ctx.fillStyle = '#9a9a9a';
+                    ctx.fillStyle = '#d0d0d0';
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    ctx.strokeStyle = '#7a7a7a';
+                    ctx.strokeStyle = '#b0b0b0';
                     ctx.lineWidth = 3;
                     ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                 } else if (obs.type === 'trailer') {
@@ -1271,19 +1271,19 @@
                 } else if (obs.type === 'workshop') {
                     drawWorkshop(obs);
                 } else if (obs.type === 'workbench') {
-                    ctx.fillStyle = '#8b7355';
+                    ctx.fillStyle = '#c09870';
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    ctx.strokeStyle = '#654321';
+                    ctx.strokeStyle = '#a08050';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                     // Tools on bench
-                    ctx.fillStyle = '#444';
+                    ctx.fillStyle = '#666';
                     ctx.fillRect(obs.x + 10, obs.y + 10, 20, 8);
                     ctx.fillRect(obs.x + 40, obs.y + 15, 15, 6);
                 } else if (obs.type === 'tool-cabinet') {
-                    ctx.fillStyle = '#cc0000';
+                    ctx.fillStyle = '#ff3333';
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    ctx.strokeStyle = '#990000';
+                    ctx.strokeStyle = '#dd1111';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                     // Drawers
@@ -1298,13 +1298,13 @@
 
         function drawWarehouse(obs) {
             const shadowOffset = 6;
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            ctx.fillStyle = '#7c90a0';
+            ctx.fillStyle = '#99c8e0';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            ctx.strokeStyle = '#6a7d8c';
+            ctx.strokeStyle = '#7ab0d0';
             ctx.lineWidth = 1;
             for (let i = 0; i < obs.width; i += 8) {
                 ctx.beginPath();
@@ -1313,15 +1313,15 @@
                 ctx.stroke();
             }
 
-            ctx.fillStyle = '#5a6d7c';
+            ctx.fillStyle = '#6a9ac0';
             ctx.fillRect(obs.x, obs.y, obs.width, 20);
 
             if (obs.bays) {
                 obs.bays.forEach(bay => {
-                    ctx.fillStyle = '#4a5d6c';
+                    ctx.fillStyle = '#5a7d8c';
                     ctx.fillRect(bay.x, bay.y - 60, bay.width, 60);
 
-                    ctx.strokeStyle = '#3a4d5c';
+                    ctx.strokeStyle = '#4a6d7c';
                     ctx.lineWidth = 2;
                     for (let j = 0; j < 5; j++) {
                         ctx.beginPath();
@@ -1335,10 +1335,10 @@
 
         function drawOffice(obs) {
             const shadowOffset = 6;
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            ctx.fillStyle = '#c4b7a6';
+            ctx.fillStyle = '#f0e0c0';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
             const windowWidth = 18;
@@ -1367,19 +1367,19 @@
 
         function drawTruck(obs) {
             const shadowOffset = 4;
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            ctx.fillStyle = '#e8e8e8';
+            ctx.fillStyle = '#ffffff';
             ctx.fillRect(obs.x, obs.y + 20, obs.width, obs.height - 30);
 
-            ctx.fillStyle = '#cc0000';
+            ctx.fillStyle = '#ff3333';
             ctx.fillRect(obs.x + 5, obs.y, obs.width - 10, 25);
 
             ctx.fillStyle = '#88ccff';
             ctx.fillRect(obs.x + 8, obs.y + 3, obs.width - 16, 8);
 
-            ctx.fillStyle = '#2a2a2a';
+            ctx.fillStyle = '#444';
             ctx.fillRect(obs.x + 5, obs.y + 20, 6, 6);
             ctx.fillRect(obs.x + obs.width - 11, obs.y + 20, 6, 6);
             ctx.fillRect(obs.x + 5, obs.y + obs.height - 12, 6, 6);
@@ -1387,10 +1387,10 @@
         }
 
         function drawRacking(obs) {
-            ctx.fillStyle = '#555';
+            ctx.fillStyle = '#777';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            ctx.strokeStyle = '#444';
+            ctx.strokeStyle = '#666';
             ctx.lineWidth = 4;
             for (let i = 0; i < obs.height; i += 100) {
                 ctx.beginPath();
@@ -1399,7 +1399,7 @@
                 ctx.stroke();
             }
 
-            ctx.strokeStyle = '#333';
+            ctx.strokeStyle = '#555';
             ctx.lineWidth = 2;
             for (let i = 0; i < obs.width; i += obs.width / 4) {
                 ctx.beginPath();
@@ -1434,27 +1434,27 @@
         }
 
         function drawFencePost(obs) {
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
             ctx.fillRect(obs.x + 2, obs.y + 2, obs.width, obs.height);
 
-            ctx.fillStyle = '#4a4a4a';
+            ctx.fillStyle = '#888';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
-            ctx.fillStyle = '#5a5a5a';
+            ctx.fillStyle = '#999';
             ctx.fillRect(obs.x - 1, obs.y, obs.width + 2, 2);
         }
 
         function drawTrailer(obs) {
             const shadowOffset = 4;
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Main trailer body - white/silver
-            ctx.fillStyle = '#e8e8e8';
+            // Main trailer body - bright white/silver
+            ctx.fillStyle = '#f8f8f8';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
             // Vertical ribs
-            ctx.strokeStyle = '#d0d0d0';
+            ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 2;
             for (let i = 0; i < obs.height; i += 20) {
                 ctx.beginPath();
@@ -1475,15 +1475,15 @@
 
         function drawWorkshop(obs) {
             const shadowOffset = 6;
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
             ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
 
-            // Main building - industrial grey
-            ctx.fillStyle = '#6a7d8c';
+            // Main building - bright industrial grey
+            ctx.fillStyle = '#8aa0b0';
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
             // Corrugated effect
-            ctx.strokeStyle = '#5a6d7c';
+            ctx.strokeStyle = '#7a90a0';
             ctx.lineWidth = 1;
             for (let i = 0; i < obs.width; i += 10) {
                 ctx.beginPath();
@@ -1493,7 +1493,7 @@
             }
 
             // Roof
-            ctx.fillStyle = '#4a5d6c';
+            ctx.fillStyle = '#6a8090';
             ctx.fillRect(obs.x, obs.y, obs.width, 20);
 
             // Large roller door
@@ -1532,7 +1532,7 @@
                     ctx.shadowBlur = 15;
                     ctx.shadowColor = '#ffed4e';
 
-                    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
                     ctx.fillRect(pallet.x - pallet.width/2 + 3, pallet.y - pallet.height/2 + 3,
                                 pallet.width, pallet.height);
 
