@@ -106,7 +106,7 @@
 
         // World data
         let missingPallets = [];
-        let forklift = null;
+        let forklifts = [];
 
         // Spawn validation
         function validateAndFixSpawn(x, y) {
@@ -415,18 +415,39 @@
             });
 
             // === CAR PARK (top left) ===
-            // Car parking bays
+            // Car parking bays (4 rows of 5)
             for (let i = 0; i < 5; i++) {
-                for (let j = 0; j < 2; j++) {
+                for (let j = 0; j < 4; j++) {
                     scene.decorations.push({
                         type: 'parking-bay',
                         x: 120 + i * 55,
-                        y: 120 + j * 100,
+                        y: 120 + j * 90,
                         width: 45,
                         height: 80
                     });
                 }
             }
+
+            // Add some parked cars in random spots
+            const carSpots = [
+                { x: 120, y: 120 },
+                { x: 175, y: 210 },
+                { x: 230, y: 120 },
+                { x: 285, y: 300 },
+                { x: 340, y: 210 },
+                { x: 120, y: 390 },
+                { x: 230, y: 300 }
+            ];
+
+            carSpots.forEach(spot => {
+                scene.decorations.push({
+                    type: 'parked-car',
+                    x: spot.x,
+                    y: spot.y,
+                    width: 45,
+                    height: 80
+                });
+            });
 
             // === OFFICE (top, right of car park) ===
             scene.obstacles.push({
@@ -517,6 +538,27 @@
                 height: 250
             });
 
+            // Workshop door
+            scene.doors.push({
+                x: 190,
+                y: 1160,
+                width: 50,
+                height: 20,
+                label: 'Enter Workshop',
+                targetSceneId: 'workshopInterior',
+                targetSpawnX: 300,
+                targetSpawnY: 350
+            });
+
+            // Gate entry (decorative)
+            scene.decorations.push({
+                type: 'gate',
+                x: 80,
+                y: 520,
+                width: 20,
+                height: 60
+            });
+
             // === PARKED TRUCKS (bottom, right of workshop) ===
             const truckStartX = 420;
             const truckStartY = 1000;
@@ -576,18 +618,23 @@
             scene.obstacles.push({ type: 'wall', x: 0, y: 0, width: 20, height: scene.height });
             scene.obstacles.push({ type: 'wall', x: scene.width - 20, y: 0, width: 20, height: scene.height });
 
-            const rackingRows = [
-                { x: 200, y: 150, width: 80, height: 600 },
-                { x: 400, y: 150, width: 80, height: 600 },
-                { x: 700, y: 150, width: 80, height: 600 },
-                { x: 1000, y: 150, width: 80, height: 600 },
-                { x: 1300, y: 150, width: 80, height: 600 },
-                { x: 1500, y: 150, width: 80, height: 600 }
-            ];
+            // Equally spaced racking rows
+            const numRacks = 6;
+            const rackWidth = 80;
+            const rackHeight = 600;
+            const totalRackWidth = numRacks * rackWidth;
+            const availableSpace = scene.width - totalRackWidth - 40; // 40 for margins
+            const rackSpacing = availableSpace / (numRacks + 1);
 
-            rackingRows.forEach(rack => {
-                scene.obstacles.push({ type: 'racking', ...rack });
-            });
+            for (let i = 0; i < numRacks; i++) {
+                scene.obstacles.push({
+                    type: 'racking',
+                    x: 20 + rackSpacing + i * (rackWidth + rackSpacing),
+                    y: 150,
+                    width: rackWidth,
+                    height: rackHeight
+                });
+            }
 
             scene.obstacles.push({ type: 'internal-room', x: 1500, y: 800, width: 250, height: 150 });
 
@@ -624,6 +671,16 @@
 
             for (let i = 0; i < 8; i++) {
                 const doorX = doorSpacing + i * (doorWidth + doorSpacing);
+
+                // Visual representation of bay door
+                scene.decorations.push({
+                    type: 'bay-door',
+                    x: doorX,
+                    y: scene.height - 70,
+                    width: doorWidth,
+                    height: 40,
+                    number: i + 1
+                });
 
                 scene.doors.push({
                     x: doorX,
@@ -694,7 +751,15 @@
 
             scene.decorations.push({ type: 'noticeboard', x: 50, y: 400, width: 80, height: 60 });
 
-            // Exit door - positioned BEFORE the bottom wall
+            // Exit door - positioned BEFORE the bottom wall with visual representation
+            scene.decorations.push({
+                type: 'exit-door',
+                x: 570,
+                y: scene.height - 70,
+                width: 60,
+                height: 40
+            });
+
             scene.doors.push({
                 x: 570,
                 y: scene.height - 70,
@@ -702,28 +767,83 @@
                 height: 40,
                 label: 'Exit to Yard',
                 targetSceneId: 'yard',
-                targetSpawnX: 250,
-                targetSpawnY: 1220
+                targetSpawnX: 540,
+                targetSpawnY: 530
+            });
+
+            return scene;
+        }
+
+        function buildWorkshopInterior() {
+            const scene = {
+                id: 'workshopInterior',
+                width: 600,
+                height: 500,
+                groundAreas: [],
+                obstacles: [],
+                decorations: [],
+                doors: [],
+                renderSettings: {
+                    ambientBrightness: 0.8,
+                    vignetteStrength: 0.4
+                },
+                safeFallbackSpawn: { x: 300, y: 250 }
+            };
+
+            scene.groundAreas.push({
+                type: 'workshop-floor',
+                x: 0, y: 0,
+                width: scene.width,
+                height: scene.height
+            });
+
+            // Perimeter walls
+            scene.obstacles.push({ type: 'wall', x: 0, y: 0, width: scene.width, height: 20 });
+            scene.obstacles.push({ type: 'wall', x: 0, y: scene.height - 20, width: scene.width, height: 20 });
+            scene.obstacles.push({ type: 'wall', x: 0, y: 0, width: 20, height: scene.height });
+            scene.obstacles.push({ type: 'wall', x: scene.width - 20, y: 0, width: 20, height: scene.height });
+
+            // Workbenches
+            scene.obstacles.push({ type: 'workbench', x: 50, y: 50, width: 150, height: 60 });
+            scene.obstacles.push({ type: 'workbench', x: 400, y: 50, width: 150, height: 60 });
+            scene.obstacles.push({ type: 'workbench', x: 50, y: 350, width: 150, height: 60 });
+
+            // Tool cabinet
+            scene.obstacles.push({ type: 'tool-cabinet', x: 400, y: 350, width: 80, height: 100 });
+
+            // Exit door
+            scene.decorations.push({
+                type: 'exit-door',
+                x: 270,
+                y: scene.height - 70,
+                width: 60,
+                height: 40
+            });
+
+            scene.doors.push({
+                x: 270,
+                y: scene.height - 70,
+                width: 60,
+                height: 40,
+                label: 'Exit to Yard',
+                targetSceneId: 'yard',
+                targetSpawnX: 240,
+                targetSpawnY: 1180
             });
 
             return scene;
         }
 
         // Forklift entity (only in yard)
-        function createForklift() {
+        function createForklift(startX, startY, patrolPath) {
             return {
-                x: 600,
-                y: 650,
+                x: startX,
+                y: startY,
                 width: 30,
                 height: 40,
                 speed: 1.2,
                 direction: 0,
-                path: [
-                    { x: 600, y: 650 },
-                    { x: 1400, y: 650 },
-                    { x: 1400, y: 800 },
-                    { x: 600, y: 800 }
-                ],
+                path: patrolPath,
                 currentTarget: 0,
 
                 update() {
@@ -769,19 +889,11 @@
                 },
 
                 hitPlayer() {
-                    const dx = player.x - this.x;
-                    const dy = player.y - this.y;
-                    const dist = Math.hypot(dx, dy);
-
-                    if (dist > 0) {
-                        player.x += (dx / dist) * 20;
-                        player.y += (dy / dist) * 20;
-                    }
-
-                    timeRemaining = Math.max(0, timeRemaining - 3);
-                    player.stunned = true;
-                    player.stunnedUntil = Date.now() + 300;
+                    // Forklift collision is instant game over
                     createImpactParticles(player.x, player.y);
+                    timeRemaining = 0;
+                    calculateScore();
+                    gameState = 'gameover';
                 },
 
                 draw() {
@@ -886,25 +998,40 @@
             scenes.yard = buildYardScene();
             scenes.warehouseInterior = buildWarehouseInterior();
             scenes.officeInterior = buildOfficeInterior();
+            scenes.workshopInterior = buildWorkshopInterior();
 
             const palletLocations = [
                 { sceneId: 'yard', x: 250, y: 250 },      // Car park area
                 { sceneId: 'yard', x: 550, y: 550 },      // Near office
                 { sceneId: 'yard', x: 1000, y: 650 },     // Center yard
                 { sceneId: 'yard', x: 1800, y: 400 },     // Trailer park area
-                { sceneId: 'yard', x: 650, y: 1100 },     // Near trucks
                 { sceneId: 'warehouseInterior', x: 300, y: 400 },
                 { sceneId: 'warehouseInterior', x: 850, y: 250 },
                 { sceneId: 'warehouseInterior', x: 1400, y: 500 },
                 { sceneId: 'officeInterior', x: 200, y: 400 },
-                { sceneId: 'officeInterior', x: 700, y: 300 }
+                { sceneId: 'officeInterior', x: 700, y: 300 },
+                { sceneId: 'workshopInterior', x: 300, y: 200 }
             ];
 
             palletLocations.forEach(loc => {
                 addMissingPallet(loc.sceneId, loc.x, loc.y);
             });
 
-            forklift = createForklift();
+            // Create two forklifts
+            forklifts = [
+                createForklift(600, 650, [
+                    { x: 600, y: 650 },
+                    { x: 1400, y: 650 },
+                    { x: 1400, y: 800 },
+                    { x: 600, y: 800 }
+                ]),
+                createForklift(1200, 1000, [
+                    { x: 1200, y: 1000 },
+                    { x: 800, y: 1000 },
+                    { x: 800, y: 1150 },
+                    { x: 1200, y: 1150 }
+                ])
+            ];
         }
 
         function addMissingPallet(sceneId, x, y) {
@@ -970,6 +1097,8 @@
                     ctx.fillStyle = '#3a3a3a';
                 } else if (area.type === 'office-floor') {
                     ctx.fillStyle = '#5a5a5a';
+                } else if (area.type === 'workshop-floor') {
+                    ctx.fillStyle = '#4a4a4a';
                 }
 
                 ctx.fillRect(area.x, area.y, area.width, area.height);
@@ -1048,6 +1177,56 @@
                     ctx.strokeStyle = '#654321';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(dec.x, dec.y, dec.width, dec.height);
+                } else if (dec.type === 'parked-car') {
+                    // Car shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillRect(dec.x + 3, dec.y + 3, dec.width, dec.height);
+                    // Car body
+                    ctx.fillStyle = ['#cc0000', '#0044cc', '#555', '#fff'][Math.floor(dec.x / 100) % 4];
+                    ctx.fillRect(dec.x, dec.y + 15, dec.width, dec.height - 15);
+                    // Car top
+                    ctx.fillRect(dec.x + 8, dec.y, dec.width - 16, 25);
+                    // Windows
+                    ctx.fillStyle = '#88ccff';
+                    ctx.fillRect(dec.x + 10, dec.y + 3, dec.width - 20, 10);
+                } else if (dec.type === 'gate') {
+                    ctx.fillStyle = '#666';
+                    ctx.fillRect(dec.x, dec.y, dec.width, dec.height);
+                    ctx.strokeStyle = '#888';
+                    ctx.lineWidth = 3;
+                    for (let i = 0; i < dec.height; i += 10) {
+                        ctx.beginPath();
+                        ctx.moveTo(dec.x, dec.y + i);
+                        ctx.lineTo(dec.x + dec.width, dec.y + i);
+                        ctx.stroke();
+                    }
+                } else if (dec.type === 'exit-door') {
+                    ctx.fillStyle = '#8b4513';
+                    ctx.fillRect(dec.x, dec.y, dec.width, dec.height);
+                    ctx.strokeStyle = '#654321';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(dec.x, dec.y, dec.width, dec.height);
+                    // Door handle
+                    ctx.fillStyle = '#999';
+                    ctx.fillRect(dec.x + dec.width - 15, dec.y + dec.height/2 - 3, 8, 6);
+                } else if (dec.type === 'bay-door') {
+                    ctx.fillStyle = '#ff6b35';
+                    ctx.fillRect(dec.x, dec.y, dec.width, dec.height);
+                    // Door sections
+                    ctx.strokeStyle = '#d45520';
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < dec.height; i += 8) {
+                        ctx.beginPath();
+                        ctx.moveTo(dec.x, dec.y + i);
+                        ctx.lineTo(dec.x + dec.width, dec.y + i);
+                        ctx.stroke();
+                    }
+                    // Bay number
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 16px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(dec.number, dec.x + dec.width/2, dec.y + dec.height/2 + 6);
+                    ctx.textAlign = 'left';
                 }
             });
         }
@@ -1091,6 +1270,28 @@
                     drawTrailer(obs);
                 } else if (obs.type === 'workshop') {
                     drawWorkshop(obs);
+                } else if (obs.type === 'workbench') {
+                    ctx.fillStyle = '#8b7355';
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    ctx.strokeStyle = '#654321';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+                    // Tools on bench
+                    ctx.fillStyle = '#444';
+                    ctx.fillRect(obs.x + 10, obs.y + 10, 20, 8);
+                    ctx.fillRect(obs.x + 40, obs.y + 15, 15, 6);
+                } else if (obs.type === 'tool-cabinet') {
+                    ctx.fillStyle = '#cc0000';
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    ctx.strokeStyle = '#990000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+                    // Drawers
+                    for (let i = 0; i < 4; i++) {
+                        ctx.strokeRect(obs.x + 5, obs.y + 10 + i * 22, obs.width - 10, 18);
+                        ctx.fillStyle = '#888';
+                        ctx.fillRect(obs.x + obs.width/2 - 3, obs.y + 17 + i * 22, 6, 4);
+                    }
                 }
             });
         }
@@ -1143,7 +1344,7 @@
             const windowWidth = 18;
             const windowHeight = 22;
             const cols = 3;
-            const rows = 7;
+            const rows = 6;
             const spacingX = (obs.width - cols * windowWidth) / (cols + 1);
             const spacingY = (obs.height - rows * windowHeight) / (rows + 1);
 
@@ -1393,21 +1594,23 @@
             ctx.lineWidth = 2;
             ctx.strokeRect(pBox.x, pBox.y, pBox.width, pBox.height);
 
-            // Forklift
+            // Forklifts
             if (currentSceneId === 'yard') {
-                ctx.strokeStyle = '#ffaa00';
-                const fBox = forklift.getBox();
-                ctx.strokeRect(fBox.x, fBox.y, fBox.width, fBox.height);
+                forklifts.forEach(forklift => {
+                    ctx.strokeStyle = '#ffaa00';
+                    const fBox = forklift.getBox();
+                    ctx.strokeRect(fBox.x, fBox.y, fBox.width, fBox.height);
 
-                ctx.strokeStyle = '#00ff00';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                forklift.path.forEach((p, i) => {
-                    if (i === 0) ctx.moveTo(p.x, p.y);
-                    else ctx.lineTo(p.x, p.y);
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    forklift.path.forEach((p, i) => {
+                        if (i === 0) ctx.moveTo(p.x, p.y);
+                        else ctx.lineTo(p.x, p.y);
+                    });
+                    ctx.closePath();
+                    ctx.stroke();
                 });
-                ctx.closePath();
-                ctx.stroke();
             }
 
             // Scene ID and door cooldown
@@ -1533,9 +1736,11 @@
                 }
             });
 
-            if (currentSceneId === 'yard' && forklift) {
+            if (currentSceneId === 'yard') {
                 ctx.fillStyle = '#ffaa00';
-                ctx.fillRect(forklift.x * scale - 2, forklift.y * scale - 2, 4, 4);
+                forklifts.forEach(forklift => {
+                    ctx.fillRect(forklift.x * scale - 2, forklift.y * scale - 2, 4, 4);
+                });
             }
 
             ctx.fillStyle = '#ff6b35';
@@ -1736,9 +1941,18 @@
             doorCooldownUntil = 0;
 
             missingPallets.forEach(p => p.collected = false);
-            forklift.x = 600;
-            forklift.y = 650;
-            forklift.currentTarget = 0;
+
+            // Reset forklifts
+            if (forklifts.length > 0) {
+                forklifts[0].x = 600;
+                forklifts[0].y = 650;
+                forklifts[0].currentTarget = 0;
+            }
+            if (forklifts.length > 1) {
+                forklifts[1].x = 1200;
+                forklifts[1].y = 1000;
+                forklifts[1].currentTarget = 0;
+            }
         }
 
         function updateGame() {
@@ -1748,7 +1962,7 @@
 
             if (gameState === 'playing') {
                 player.update();
-                forklift.update();
+                forklifts.forEach(f => f.update());
                 camera.update(player);
                 updateParticles();
                 updateFade();
@@ -1819,7 +2033,9 @@
                 ];
 
                 if (currentSceneId === 'yard') {
-                    entities.push({ obj: forklift, y: forklift.y, draw: () => forklift.draw() });
+                    forklifts.forEach(forklift => {
+                        entities.push({ obj: forklift, y: forklift.y, draw: () => forklift.draw() });
+                    });
                 }
 
                 entities.sort((a, b) => a.y - b.y);
