@@ -366,6 +366,7 @@
                 safeFallbackSpawn: { x: 700, y: 700 }
             };
 
+            // Base grass
             scene.groundAreas.push({
                 type: 'grass',
                 x: 0, y: 0,
@@ -373,97 +374,90 @@
                 height: scene.height
             });
 
+            // Road across top
             scene.groundAreas.push({
                 type: 'road',
-                x: 0, y: 1320,
+                x: 0, y: 0,
                 width: scene.width,
                 height: 80
             });
 
+            // Road down left side
             scene.groundAreas.push({
                 type: 'road',
-                x: 250, y: 1200,
-                width: 120,
-                height: 120
+                x: 0, y: 0,
+                width: 80,
+                height: scene.height
             });
 
+            // Car park tarmac (top left)
             scene.groundAreas.push({
                 type: 'tarmac',
-                x: 150, y: 900,
-                width: 1100,
+                x: 100, y: 100,
+                width: 300,
+                height: 250
+            });
+
+            // Yard tarmac (center area)
+            scene.groundAreas.push({
+                type: 'tarmac',
+                x: 100, y: 550,
+                width: 2200,
                 height: 300
             });
 
+            // Workshop area tarmac (bottom left)
             scene.groundAreas.push({
                 type: 'tarmac',
-                x: 500, y: 400,
-                width: 600,
-                height: 550
+                x: 100, y: 900,
+                width: 1200,
+                height: 400
             });
 
-            scene.groundAreas.push({
-                type: 'tarmac',
-                x: 500, y: 500,
-                width: 700,
-                height: 200
+            // === CAR PARK (top left) ===
+            // Car parking bays
+            for (let i = 0; i < 5; i++) {
+                for (let j = 0; j < 2; j++) {
+                    scene.decorations.push({
+                        type: 'parking-bay',
+                        x: 120 + i * 55,
+                        y: 120 + j * 100,
+                        width: 45,
+                        height: 80
+                    });
+                }
+            }
+
+            // === OFFICE (top, right of car park) ===
+            scene.obstacles.push({
+                type: 'office',
+                x: 430, y: 100,
+                width: 220,
+                height: 300
             });
 
-            const fenceThickness = 8;
+            // Office door - below office entrance
+            scene.doors.push({
+                x: 515,
+                y: 410,
+                width: 50,
+                height: 20,
+                label: 'Enter Office',
+                targetSceneId: 'officeInterior',
+                targetSpawnX: 600,
+                targetSpawnY: 720
+            });
 
-            for (let x = 0; x < scene.width; x += 80) {
-                scene.obstacles.push({
-                    type: 'fence-post',
-                    x, y: 50,
-                    width: fenceThickness,
-                    height: fenceThickness
-                });
-            }
-
-            for (let x = 0; x < 250; x += 80) {
-                scene.obstacles.push({
-                    type: 'fence-post',
-                    x, y: 1200,
-                    width: fenceThickness,
-                    height: fenceThickness
-                });
-            }
-            for (let x = 370; x < scene.width; x += 80) {
-                scene.obstacles.push({
-                    type: 'fence-post',
-                    x, y: 1200,
-                    width: fenceThickness,
-                    height: fenceThickness
-                });
-            }
-
-            for (let y = 50; y < 1200; y += 80) {
-                scene.obstacles.push({
-                    type: 'fence-post',
-                    x: 50, y,
-                    width: fenceThickness,
-                    height: fenceThickness
-                });
-            }
-
-            for (let y = 50; y < 1200; y += 80) {
-                scene.obstacles.push({
-                    type: 'fence-post',
-                    x: 1350, y,
-                    width: fenceThickness,
-                    height: fenceThickness
-                });
-            }
-
-            // Warehouse (x: 600-1200, y: 150-400)
+            // === LARGE WAREHOUSE (top, right of office) ===
             const warehouse = {
                 type: 'warehouse-main',
-                x: 600, y: 150,
-                width: 600,
-                height: 250,
+                x: 680, y: 100,
+                width: 800,
+                height: 400,
                 bays: []
             };
 
-            const bayWidth = 60;
+            const bayWidth = 70;
             const baySpacing = (warehouse.width - bayWidth * 8) / 9;
 
             for (let i = 0; i < 8; i++) {
@@ -481,58 +475,47 @@
 
             scene.obstacles.push(warehouse);
 
-            // Warehouse door - positioned OUTSIDE building at left side, below it
+            // Warehouse door - below warehouse at bay 4
             scene.doors.push({
-                x: 565,
-                y: 415,
-                width: 50,
+                x: 1000,
+                y: 510,
+                width: 60,
                 height: 20,
                 label: 'Enter Warehouse',
                 targetSceneId: 'warehouseInterior',
-                targetSpawnX: 100,
+                targetSpawnX: 900,
                 targetSpawnY: 900
             });
 
-            // Office block (x: 180-320, y: 1000-1180)
-            scene.obstacles.push({
-                type: 'office',
-                x: 180, y: 1000,
-                width: 140,
-                height: 180
-            });
-
-            // Office door - positioned OUTSIDE building at entrance
-            scene.doors.push({
-                x: 235,
-                y: 1195,
-                width: 30,
-                height: 20,
-                label: 'Enter Office',
-                targetSceneId: 'officeInterior',
-                targetSpawnX: 600,
-                targetSpawnY: 720
-            });
-
-            for (let i = 0; i < 4; i++) {
-                scene.decorations.push({
-                    type: 'parking-bay',
-                    x: 180 + i * 35,
-                    y: 880,
-                    width: 30,
-                    height: 50
-                });
+            // === TRAILER PARK (top right, right of warehouse) ===
+            // Parked trailers
+            const trailerStartX = 1510;
+            const trailerStartY = 120;
+            for (let row = 0; row < 2; row++) {
+                for (let col = 0; col < 6; col++) {
+                    scene.obstacles.push({
+                        type: 'trailer',
+                        x: trailerStartX + col * 140,
+                        y: trailerStartY + row * 200,
+                        width: 50,
+                        height: 150,
+                        id: row * 6 + col
+                    });
+                }
             }
 
-            scene.decorations.push({
-                type: 'footpath',
-                x: 250, y: 900,
-                width: 60,
-                height: 100
+            // === WORKSHOP (bottom left) ===
+            scene.obstacles.push({
+                type: 'workshop',
+                x: 100, y: 900,
+                width: 280,
+                height: 250
             });
 
-            const truckStartX = 800;
-            const truckStartY = 800;
-            const truckSpacing = 100;
+            // === PARKED TRUCKS (bottom, right of workshop) ===
+            const truckStartX = 420;
+            const truckStartY = 1000;
+            const truckSpacing = 110;
 
             for (let i = 0; i < 10; i++) {
                 scene.obstacles.push({
@@ -545,22 +528,22 @@
                 });
             }
 
-            for (let i = 0; i < 15; i++) {
-                const x = 200 + Math.random() * 1000;
-                const y = 450 + Math.random() * 500;
+            // Decorative elements
+            for (let i = 0; i < 20; i++) {
+                const x = 100 + Math.random() * 2100;
+                const y = 550 + Math.random() * 600;
                 scene.decorations.push({
                     type: 'oil-stain',
                     x, y,
-                    size: 20 + Math.random() * 30
+                    size: 15 + Math.random() * 25
                 });
             }
 
             const conePositions = [
-                { x: 500, y: 950 },
-                { x: 650, y: 420 },
-                { x: 1150, y: 650 },
-                { x: 350, y: 1050 },
-                { x: 1100, y: 900 }
+                { x: 650, y: 600 },
+                { x: 1250, y: 700 },
+                { x: 450, y: 850 },
+                { x: 1650, y: 650 }
             ];
 
             conePositions.forEach(pos => {
@@ -733,17 +716,17 @@
         // Forklift entity (only in yard)
         function createForklift() {
             return {
-                x: 700,
-                y: 600,
+                x: 600,
+                y: 650,
                 width: 30,
                 height: 40,
                 speed: 1.2,
                 direction: 0,
                 path: [
-                    { x: 700, y: 600 },
-                    { x: 1000, y: 600 },
-                    { x: 1000, y: 850 },
-                    { x: 700, y: 850 }
+                    { x: 600, y: 650 },
+                    { x: 1400, y: 650 },
+                    { x: 1400, y: 800 },
+                    { x: 600, y: 800 }
                 ],
                 currentTarget: 0,
 
@@ -909,11 +892,11 @@
             scenes.officeInterior = buildOfficeInterior();
 
             const palletLocations = [
-                { sceneId: 'yard', x: 750, y: 520 },
-                { sceneId: 'yard', x: 1150, y: 520 },
-                { sceneId: 'yard', x: 900, y: 350 },
-                { sceneId: 'yard', x: 650, y: 750 },
-                { sceneId: 'yard', x: 950, y: 950 },
+                { sceneId: 'yard', x: 250, y: 250 },      // Car park area
+                { sceneId: 'yard', x: 550, y: 550 },      // Near office
+                { sceneId: 'yard', x: 1000, y: 650 },     // Center yard
+                { sceneId: 'yard', x: 1800, y: 400 },     // Trailer park area
+                { sceneId: 'yard', x: 650, y: 1100 },     // Near trucks
                 { sceneId: 'warehouseInterior', x: 300, y: 400 },
                 { sceneId: 'warehouseInterior', x: 850, y: 250 },
                 { sceneId: 'warehouseInterior', x: 1400, y: 500 },
@@ -1108,6 +1091,10 @@
                     ctx.strokeStyle = '#7a7a7a';
                     ctx.lineWidth = 3;
                     ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+                } else if (obs.type === 'trailer') {
+                    drawTrailer(obs);
+                } else if (obs.type === 'workshop') {
+                    drawWorkshop(obs);
                 }
             });
         }
@@ -1268,6 +1255,84 @@
 
             ctx.fillStyle = '#5a5a5a';
             ctx.fillRect(obs.x - 1, obs.y, obs.width + 2, 2);
+        }
+
+        function drawTrailer(obs) {
+            const shadowOffset = 4;
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Main trailer body - white/silver
+            ctx.fillStyle = '#e8e8e8';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Vertical ribs
+            ctx.strokeStyle = '#d0d0d0';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < obs.height; i += 20) {
+                ctx.beginPath();
+                ctx.moveTo(obs.x, obs.y + i);
+                ctx.lineTo(obs.x + obs.width, obs.y + i);
+                ctx.stroke();
+            }
+
+            // Border
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Door at back
+            ctx.fillStyle = '#bbb';
+            ctx.fillRect(obs.x + obs.width - 3, obs.y + obs.height/2 - 20, 3, 40);
+        }
+
+        function drawWorkshop(obs) {
+            const shadowOffset = 6;
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(obs.x + shadowOffset, obs.y + shadowOffset, obs.width, obs.height);
+
+            // Main building - industrial grey
+            ctx.fillStyle = '#6a7d8c';
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // Corrugated effect
+            ctx.strokeStyle = '#5a6d7c';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < obs.width; i += 10) {
+                ctx.beginPath();
+                ctx.moveTo(obs.x + i, obs.y);
+                ctx.lineTo(obs.x + i, obs.y + obs.height);
+                ctx.stroke();
+            }
+
+            // Roof
+            ctx.fillStyle = '#4a5d6c';
+            ctx.fillRect(obs.x, obs.y, obs.width, 20);
+
+            // Large roller door
+            ctx.fillStyle = '#ff6b35';
+            const doorWidth = obs.width * 0.6;
+            const doorHeight = obs.height * 0.7;
+            const doorX = obs.x + (obs.width - doorWidth) / 2;
+            const doorY = obs.y + obs.height - doorHeight;
+            ctx.fillRect(doorX, doorY, doorWidth, doorHeight);
+
+            // Door sections
+            ctx.strokeStyle = '#d45520';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < doorHeight; i += 25) {
+                ctx.beginPath();
+                ctx.moveTo(doorX, doorY + i);
+                ctx.lineTo(doorX + doorWidth, doorY + i);
+                ctx.stroke();
+            }
+
+            // Window
+            ctx.fillStyle = '#a8d8f0';
+            ctx.fillRect(obs.x + 20, obs.y + 30, 40, 30);
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(obs.x + 20, obs.y + 30, 40, 30);
         }
 
         function drawMissingPallets() {
@@ -1685,8 +1750,8 @@
             doorCooldownUntil = 0;
 
             missingPallets.forEach(p => p.collected = false);
-            forklift.x = 700;
-            forklift.y = 600;
+            forklift.x = 600;
+            forklift.y = 650;
             forklift.currentTarget = 0;
         }
 
