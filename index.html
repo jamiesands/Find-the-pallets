@@ -457,16 +457,16 @@
                 height: 400
             });
 
-            // Office door - below office entrance
+            // Office door - on left side
             scene.doors.push({
-                x: 515,
-                y: 510,
-                width: 50,
-                height: 20,
+                x: 420,
+                y: 280,
+                width: 20,
+                height: 50,
                 label: 'Enter Office',
                 targetSceneId: 'officeInterior',
-                targetSpawnX: 600,
-                targetSpawnY: 720
+                targetSpawnX: 100,
+                targetSpawnY: 400
             });
 
             // === LARGE WAREHOUSE (top, right of office) ===
@@ -572,17 +572,6 @@
                     width: 40,
                     height: 90,
                     id: i
-                });
-            }
-
-            // Decorative elements
-            for (let i = 0; i < 20; i++) {
-                const x = 100 + Math.random() * 2100;
-                const y = 550 + Math.random() * 600;
-                scene.decorations.push({
-                    type: 'oil-stain',
-                    x, y,
-                    size: 15 + Math.random() * 25
                 });
             }
 
@@ -751,24 +740,44 @@
 
             scene.decorations.push({ type: 'noticeboard', x: 50, y: 400, width: 80, height: 60 });
 
-            // Exit door - positioned BEFORE the bottom wall with visual representation
+            // Exit door to yard - on left side
             scene.decorations.push({
                 type: 'exit-door',
-                x: 570,
-                y: scene.height - 70,
-                width: 60,
-                height: 40
+                x: 20,
+                y: 370,
+                width: 40,
+                height: 60
             });
 
             scene.doors.push({
-                x: 570,
-                y: scene.height - 70,
-                width: 60,
-                height: 40,
+                x: 20,
+                y: 370,
+                width: 40,
+                height: 60,
                 label: 'Exit to Yard',
                 targetSceneId: 'yard',
-                targetSpawnX: 540,
-                targetSpawnY: 530
+                targetSpawnX: 410,
+                targetSpawnY: 280
+            });
+
+            // Door to warehouse - on right side
+            scene.decorations.push({
+                type: 'exit-door',
+                x: scene.width - 60,
+                y: 370,
+                width: 40,
+                height: 60
+            });
+
+            scene.doors.push({
+                x: scene.width - 60,
+                y: 370,
+                width: 40,
+                height: 60,
+                label: 'To Warehouse',
+                targetSceneId: 'warehouseInterior',
+                targetSpawnX: 100,
+                targetSpawnY: 500
             });
 
             return scene;
@@ -1035,6 +1044,48 @@
         }
 
         function addMissingPallet(sceneId, x, y) {
+            // Validate pallet position doesn't overlap with obstacles
+            const scene = scenes[sceneId];
+            const palletBox = {
+                x: x - 15,
+                y: y - 15,
+                width: 30,
+                height: 30
+            };
+
+            // Check if pallet overlaps with any obstacle
+            const hasCollision = scene.obstacles.some(obs => rectCollision(palletBox, obs));
+
+            if (hasCollision) {
+                // Search for nearby safe position
+                const searchRadius = 100;
+                const searchStep = 20;
+
+                for (let radius = searchStep; radius <= searchRadius; radius += searchStep) {
+                    const angles = 12;
+                    for (let i = 0; i < angles; i++) {
+                        const angle = (Math.PI * 2 * i) / angles;
+                        const testX = x + Math.cos(angle) * radius;
+                        const testY = y + Math.sin(angle) * radius;
+
+                        const testBox = {
+                            x: testX - 15,
+                            y: testY - 15,
+                            width: 30,
+                            height: 30
+                        };
+
+                        const testCollision = scene.obstacles.some(obs => rectCollision(testBox, obs));
+                        if (!testCollision && testX >= 50 && testX <= scene.width - 50 && testY >= 50 && testY <= scene.height - 50) {
+                            x = testX;
+                            y = testY;
+                            break;
+                        }
+                    }
+                    if (!hasCollision) break;
+                }
+            }
+
             missingPallets.push({
                 sceneId,
                 x, y,
