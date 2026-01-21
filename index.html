@@ -469,6 +469,15 @@
                 targetSpawnY: 400
             });
 
+            // Visual door on office exterior (left side)
+            scene.decorations.push({
+                type: 'exit-door',
+                x: 420,
+                y: 280,
+                width: 20,
+                height: 50
+            });
+
             // === LARGE WAREHOUSE (top, right of office) ===
             const warehouse = {
                 type: 'warehouse-main',
@@ -550,15 +559,6 @@
                 targetSpawnY: 350
             });
 
-            // Gate entry (decorative)
-            scene.decorations.push({
-                type: 'gate',
-                x: 80,
-                y: 520,
-                width: 20,
-                height: 60
-            });
-
             // === PARKED TRUCKS (bottom, right of workshop) ===
             const truckStartX = 420;
             const truckStartY = 1000;
@@ -625,7 +625,14 @@
                 });
             }
 
-            scene.obstacles.push({ type: 'internal-room', x: 1500, y: 800, width: 250, height: 150 });
+            // Visual door from office (on left side of warehouse)
+            scene.decorations.push({
+                type: 'exit-door',
+                x: 20,
+                y: 370,
+                width: 40,
+                height: 60
+            });
 
             for (let x = 100; x < scene.width; x += 200) {
                 scene.decorations.push({
@@ -1034,11 +1041,11 @@
                     { x: 1400, y: 800 },
                     { x: 600, y: 800 }
                 ]),
-                createForklift(1200, 1000, [
-                    { x: 1200, y: 1000 },
-                    { x: 800, y: 1000 },
-                    { x: 800, y: 1150 },
-                    { x: 1200, y: 1150 }
+                createForklift(1200, 750, [
+                    { x: 1200, y: 750 },
+                    { x: 500, y: 750 },
+                    { x: 500, y: 850 },
+                    { x: 1200, y: 850 }
                 ])
             ];
         }
@@ -1851,7 +1858,7 @@
             ctx.font = '16px Courier New';
             ctx.fillStyle = '#aaa';
             ctx.fillText('+100 per pallet, +1 per second remaining', CONFIG.canvas.width / 2, 450);
-            ctx.fillText('Forklift collision: -3 seconds', CONFIG.canvas.width / 2, 475);
+            ctx.fillText('Forklift collision: Game Over!', CONFIG.canvas.width / 2, 475);
 
             if (bestScore > 0) {
                 ctx.fillStyle = '#ffed4e';
@@ -2003,7 +2010,7 @@
             }
             if (forklifts.length > 1) {
                 forklifts[1].x = 1200;
-                forklifts[1].y = 1000;
+                forklifts[1].y = 750;
                 forklifts[1].currentTarget = 0;
             }
         }
