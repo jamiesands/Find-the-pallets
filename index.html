@@ -1060,6 +1060,7 @@
                 // Search for nearby safe position
                 const searchRadius = 100;
                 const searchStep = 20;
+                let foundSafe = false;
 
                 for (let radius = searchStep; radius <= searchRadius; radius += searchStep) {
                     const angles = 12;
@@ -1079,10 +1080,11 @@
                         if (!testCollision && testX >= 50 && testX <= scene.width - 50 && testY >= 50 && testY <= scene.height - 50) {
                             x = testX;
                             y = testY;
+                            foundSafe = true;
                             break;
                         }
                     }
-                    if (!hasCollision) break;
+                    if (foundSafe) break;
                 }
             }
 
