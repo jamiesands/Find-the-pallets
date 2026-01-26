@@ -575,6 +575,39 @@
                 });
             }
 
+            // === TREES (bottom right grassy area) ===
+            const treePositions = [
+                { x: 1400, y: 950, size: 35 },
+                { x: 1550, y: 1050, size: 40 },
+                { x: 1700, y: 920, size: 30 },
+                { x: 1850, y: 1100, size: 38 },
+                { x: 2000, y: 980, size: 35 },
+                { x: 2150, y: 1150, size: 42 },
+                { x: 1600, y: 1200, size: 33 },
+                { x: 1900, y: 1250, size: 36 },
+                { x: 2200, y: 1050, size: 40 },
+                { x: 2050, y: 1300, size: 35 }
+            ];
+
+            treePositions.forEach(tree => {
+                // Add as obstacle (trunk collision)
+                scene.obstacles.push({
+                    type: 'tree',
+                    x: tree.x - tree.size * 0.3,
+                    y: tree.y - tree.size * 0.3,
+                    width: tree.size * 0.6,
+                    height: tree.size * 0.6
+                });
+
+                // Add as decoration (visual)
+                scene.decorations.push({
+                    type: 'tree',
+                    x: tree.x,
+                    y: tree.y,
+                    size: tree.size
+                });
+            });
+
             return scene;
         }
 
@@ -1280,6 +1313,34 @@
                     // Windows
                     ctx.fillStyle = '#88ccff';
                     ctx.fillRect(dec.x + 10, dec.y + 3, dec.width - 20, 10);
+                } else if (dec.type === 'tree') {
+                    // Tree shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                    ctx.beginPath();
+                    ctx.ellipse(dec.x + 2, dec.y + dec.size * 0.4 + 3, dec.size * 0.4, dec.size * 0.2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tree trunk
+                    ctx.fillStyle = '#8b6914';
+                    const trunkWidth = dec.size * 0.3;
+                    const trunkHeight = dec.size * 0.6;
+                    ctx.fillRect(dec.x - trunkWidth/2, dec.y - trunkHeight/2, trunkWidth, trunkHeight);
+
+                    // Tree foliage - three circles for a fuller look
+                    ctx.fillStyle = '#4a7c3e';
+                    ctx.beginPath();
+                    ctx.arc(dec.x - dec.size * 0.2, dec.y - dec.size * 0.35, dec.size * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#5a9c4e';
+                    ctx.beginPath();
+                    ctx.arc(dec.x + dec.size * 0.2, dec.y - dec.size * 0.35, dec.size * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#6aac5e';
+                    ctx.beginPath();
+                    ctx.arc(dec.x, dec.y - dec.size * 0.5, dec.size * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
                 } else if (dec.type === 'gate') {
                     ctx.fillStyle = '#666';
                     ctx.fillRect(dec.x, dec.y, dec.width, dec.height);
@@ -1382,6 +1443,14 @@
                         ctx.strokeRect(obs.x + 5, obs.y + 10 + i * 22, obs.width - 10, 18);
                         ctx.fillStyle = '#888';
                         ctx.fillRect(obs.x + obs.width/2 - 3, obs.y + 17 + i * 22, 6, 4);
+                    }
+                } else if (obs.type === 'tree') {
+                    // Tree visual is drawn in decorations, obstacle is just for collision
+                    // Optionally draw debug hitbox if needed
+                    if (debugMode) {
+                        ctx.strokeStyle = 'rgba(255,0,0,0.3)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                     }
                 }
             });
