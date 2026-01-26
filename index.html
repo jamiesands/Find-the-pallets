@@ -469,15 +469,6 @@
                 targetSpawnY: 400
             });
 
-            // Visual door on office exterior (left side)
-            scene.decorations.push({
-                type: 'exit-door',
-                x: 420,
-                y: 280,
-                width: 20,
-                height: 50
-            });
-
             // === LARGE WAREHOUSE (top, right of office) ===
             const warehouse = {
                 type: 'warehouse-main',
@@ -738,14 +729,11 @@
                 scene.obstacles.push({ type: 'desk', ...desk });
             });
 
-            scene.obstacles.push({ type: 'meeting-room', x: 800, y: 150, width: 350, height: 250 });
-            scene.obstacles.push({ type: 'wall', x: 400, y: 400, width: 20, height: 300 });
+            scene.obstacles.push({ type: 'meeting-room', x: 850, y: 150, width: 280, height: 200 });
 
             scene.decorations.push({ type: 'plant', x: 450, y: 100, size: 30 });
             scene.decorations.push({ type: 'plant', x: 750, y: 100, size: 30 });
             scene.decorations.push({ type: 'plant', x: 100, y: 500, size: 30 });
-
-            scene.decorations.push({ type: 'noticeboard', x: 50, y: 400, width: 80, height: 60 });
 
             // Exit door to yard - on left side
             scene.decorations.push({
