@@ -1447,7 +1447,7 @@
                 } else if (obs.type === 'tree') {
                     // Tree visual is drawn in decorations, obstacle is just for collision
                     // Optionally draw debug hitbox if needed
-                    if (debugMode) {
+                    if (showDebug) {
                         ctx.strokeStyle = 'rgba(255,0,0,0.3)';
                         ctx.lineWidth = 1;
                         ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
