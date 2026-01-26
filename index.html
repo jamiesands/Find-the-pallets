@@ -469,6 +469,15 @@
                 targetSpawnY: 400
             });
 
+            // Visual door on office exterior (left side)
+            scene.decorations.push({
+                type: 'exit-door',
+                x: 420,
+                y: 280,
+                width: 20,
+                height: 50
+            });
+
             // === LARGE WAREHOUSE (top, right of office) ===
             const warehouse = {
                 type: 'warehouse-main',
@@ -623,6 +632,18 @@
                 y: 370,
                 width: 40,
                 height: 60
+            });
+
+            // Door to office (on left side of warehouse)
+            scene.doors.push({
+                x: 20,
+                y: 370,
+                width: 40,
+                height: 60,
+                label: 'To Office',
+                targetSceneId: 'officeInterior',
+                targetSpawnX: 1100,
+                targetSpawnY: 400
             });
 
             for (let x = 100; x < scene.width; x += 200) {
