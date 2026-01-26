@@ -1025,22 +1025,8 @@
             scenes.officeInterior = buildOfficeInterior();
             scenes.workshopInterior = buildWorkshopInterior();
 
-            const palletLocations = [
-                { sceneId: 'yard', x: 250, y: 250 },      // Car park area
-                { sceneId: 'yard', x: 550, y: 550 },      // Near office
-                { sceneId: 'yard', x: 1000, y: 650 },     // Center yard
-                { sceneId: 'yard', x: 1800, y: 400 },     // Trailer park area
-                { sceneId: 'warehouseInterior', x: 300, y: 400 },
-                { sceneId: 'warehouseInterior', x: 850, y: 250 },
-                { sceneId: 'warehouseInterior', x: 1400, y: 500 },
-                { sceneId: 'officeInterior', x: 200, y: 400 },
-                { sceneId: 'officeInterior', x: 700, y: 300 },
-                { sceneId: 'workshopInterior', x: 300, y: 200 }
-            ];
-
-            palletLocations.forEach(loc => {
-                addMissingPallet(loc.sceneId, loc.x, loc.y);
-            });
+            // Generate random pallet locations
+            generatePallets();
 
             // Create two forklifts
             forklifts = [
@@ -1057,6 +1043,42 @@
                     { x: 1200, y: 850 }
                 ])
             ];
+        }
+
+        function generatePallets() {
+            missingPallets = [];
+
+            // Define how many pallets per scene
+            const palletDistribution = [
+                { sceneId: 'yard', count: 4 },
+                { sceneId: 'warehouseInterior', count: 3 },
+                { sceneId: 'officeInterior', count: 2 },
+                { sceneId: 'workshopInterior', count: 1 }
+            ];
+
+            palletDistribution.forEach(dist => {
+                const scene = scenes[dist.sceneId];
+                for (let i = 0; i < dist.count; i++) {
+                    let placed = false;
+                    let attempts = 0;
+                    const maxAttempts = 50;
+
+                    while (!placed && attempts < maxAttempts) {
+                        // Generate random position with margins
+                        const x = 100 + Math.random() * (scene.width - 200);
+                        const y = 100 + Math.random() * (scene.height - 200);
+
+                        // Try to add pallet (will auto-validate and adjust position)
+                        const beforeCount = missingPallets.length;
+                        addMissingPallet(dist.sceneId, x, y);
+
+                        if (missingPallets.length > beforeCount) {
+                            placed = true;
+                        }
+                        attempts++;
+                    }
+                }
+            });
         }
 
         function addMissingPallet(sceneId, x, y) {
